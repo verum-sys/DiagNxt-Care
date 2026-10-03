@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #0b3b5c;
+  --color-brand-dark: #072a42;
+  --color-accent: #0f9d8a;
+  --color-accent-soft: #d9f3ee;
+  --color-surface: #f4f7fa;
+  --color-ink: #16222e;
+  --color-muted: #5b6b7a;
+  --color-line: #d7dfe6;
+  --color-warn: #b45309;
+  --color-warn-soft: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-ok: #15803d;
+  --color-ok-soft: #dcfce7;
+  --color-info-soft: #e0ecf7;
+}
+
+/* Readability spec: 18px base, 48px tap targets, text-labelled buttons. */
+html {
+  font-size: 18px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  line-height: 1.45;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button, a[role="button"], label.tap {
+  min-height: 48px;
+}
+
+input, select, textarea {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: #fff;
+}
+
+textarea { min-height: 7rem; }
+
+input:focus, select:focus, textarea:focus, button:focus-visible {
+  outline: 3px solid #7cc4f5;
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.85rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--color-brand); color: #fff; }
+.btn-primary:hover { background: var(--color-brand-dark); }
+.btn-accent { background: var(--color-accent); color: #fff; }
+.btn-secondary { background: #fff; color: var(--color-brand); border-color: var(--color-line); }
+.btn-ghost { background: transparent; color: var(--color-brand); }
+.btn-block { width: 100%; }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
