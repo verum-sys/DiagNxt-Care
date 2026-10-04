@@ -21,7 +21,13 @@ import type {
 import { useLang } from '../../i18n';
 import { today } from '../../intelligence/dates';
 import { analyze } from '../../intelligence/engine';
-import { EXAMPLES, parseFreeTextWithSpans, type FieldSpan, type ParsedCase, type ParsedField } from '../../intelligence/parser';
+import {
+  allDemoCaseTexts,
+  DEMO_CASE_TEXT,
+  type DemoCaseId,
+  type DemoLang,
+} from '../../intelligence/demoCases';
+import { parseFreeTextWithSpans, type FieldSpan, type ParsedCase, type ParsedField } from '../../intelligence/parser';
 import { buildDraftFieldRows } from '../../intelligence/stage/draftFields';
 import {
   CHECKLIST_LABEL,
@@ -132,6 +138,7 @@ export function NewCase() {
   const [reviewed, setReviewed] = useState(false);
   const [needsReunderstand, setNeedsReunderstand] = useState(false);
   const [notesLinked, setNotesLinked] = useState(true);
+  const [exampleLang, setExampleLang] = useState<DemoLang>('en');
   const [highlightField, setHighlightField] = useState<ParsedField | null>(null);
   const [reviewDialogChecked, setReviewDialogChecked] = useState(false);
   const [appointmentTentative, setAppointmentTentative] = useState(false);
@@ -269,7 +276,14 @@ export function NewCase() {
     return buildDraftFieldRows(text, parsed, form);
   }, [parsed, describeInSync, text, form]);
   const activeSpans = describeInSync ? spans : [];
-  const isExampleText = (Object.values(EXAMPLES) as string[]).includes(text);
+  const isExampleText = allDemoCaseTexts().includes(text);
+  const demoCaseIds: DemoCaseId[] = ['case1', 'case2', 'case3'];
+
+  function loadDemoCase(caseId: DemoCaseId) {
+    const sample = DEMO_CASE_TEXT[exampleLang][caseId];
+    setText(sample);
+    understand(sample);
+  }
   const canSaveNew =
     !editing && parsed !== null && reviewed && describeInSync && !needsReunderstand;
 
@@ -371,19 +385,30 @@ export function NewCase() {
           <div>
             <div className="mb-1 text-[0.85rem] font-semibold text-muted">{t('new.examples')}</div>
             <p className="mb-2 text-[0.85rem] text-muted">{t('new.examplesHint')}</p>
-            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+            <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label={t('new.examples')}>
               {(['en', 'hinglish', 'hindi'] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
-                  className={`btn ${selectedSample === k ? 'btn-primary' : 'btn-secondary'} !min-h-[38px] sm:!min-h-[44px] !px-2 text-[0.82rem] sm:text-[0.9rem]`}
-                  onClick={() => {
-                    setSelectedSample(k);
-                    setText(EXAMPLES[k]);
-                    understand(EXAMPLES[k]);
-                  }}
+                  role="tab"
+                  aria-selected={exampleLang === k}
+                  className={`btn !min-h-[44px] text-[0.9rem] ${exampleLang === k ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setExampleLang(k)}
                 >
                   {t(`new.example.${k}`)}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {demoCaseIds.map((caseId) => (
+                <button
+                  key={caseId}
+                  type="button"
+                  className="btn btn-secondary btn-block !min-h-[52px] !flex-col items-start !py-2 text-left"
+                  onClick={() => loadDemoCase(caseId)}
+                >
+                  <span className="font-bold">{t(`new.demo.${caseId}.title`)}</span>
+                  <span className="text-[0.85rem] font-normal text-muted">{t(`new.demo.${caseId}.blurb`)}</span>
                 </button>
               ))}
             </div>

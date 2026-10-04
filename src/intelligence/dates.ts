@@ -26,3 +26,24 @@ export function daysBetween(a: string, b: string): number {
 export function isValidISODate(s: string | undefined): s is string {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
+
+/** 0 = Sunday … 6 = Saturday (local calendar). */
+export function weekdayIndexFromAnchor(anchorIso: string): number {
+  const [y, m, d] = anchorIso.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+export type WeekdayDirection = 'future' | 'past';
+
+/** ISO date of the nearest named weekday relative to anchor (same week logic as field speech). */
+export function nearestWeekdayIso(weekdayIndex: number, anchorIso: string, direction: WeekdayDirection): string {
+  const anchorDay = weekdayIndexFromAnchor(anchorIso);
+  let delta = weekdayIndex - anchorDay;
+  if (direction === 'future') {
+    if (delta <= 0) delta += 7;
+  } else {
+    if (delta >= 0) delta -= 7;
+    if (delta === 0) delta = -7;
+  }
+  return addDays(anchorIso, delta);
+}

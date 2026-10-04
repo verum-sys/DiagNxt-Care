@@ -10,10 +10,12 @@
  * | completed              | closed, attended_outcome_unknown (partial)    |
  */
 import type { CaseStageKey, DraftFieldKey, Patient, Referral, StageExpectations } from '../../db/types';
+import { today } from '../dates';
 import type { EffectiveFacts } from '../facts';
 import type { ParsedCase } from '../parser';
 
-const REFER_RE = /\b(?:referred|refer(?:ral|red| kiya| kiya hai| kar)|रेफर)\b/i;
+const REFER_RE =
+  /\b(?:referred|referring|refer(?:ral|red| kiya| kiya tha| kiya hai| kar(?:a| rahi| raha|))|रेफर(?: कर)?)\b/i;
 
 export function hasReferLanguage(text: string): boolean {
   return REFER_RE.test(text);
@@ -24,12 +26,22 @@ export interface DraftStageInput {
   parsed: ParsedCase;
   destinationFacility?: string;
   reason?: string;
+  /** ISO date for comparing appointment to “today” on New Case draft. */
+  now?: string;
 }
 
 export function deriveCaseStageFromDraft(input: DraftStageInput): CaseStageKey {
-  const dest = (input.destinationFacility || input.parsed.destinationFacility || '').trim();
-  const reason = (input.reason || input.parsed.reason || '').trim();
-  const referred = input.parsed.referralDecision === 'referred' || hasReferLanguage(input.text);
+  const now = input.now ?? today();
+  const parsed = input.parsed;
+  const appt = parsed.appointmentDate;
+
+  if (parsed.facilityAccepted && appt && appt < now) return 'follow_up_due';
+  if (appt) return 'appointment_scheduled';
+  if (parsed.facilityAccepted) return 'referral_accepted';
+
+  const dest = (input.destinationFacility || parsed.destinationFacility || '').trim();
+  const reason = (input.reason || parsed.reason || '').trim();
+  const referred = parsed.referralDecision === 'referred' || hasReferLanguage(input.text);
 
   if (referred && dest) return 'referral_initiated';
   if (dest && reason) return 'referral_initiated';

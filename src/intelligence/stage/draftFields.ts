@@ -9,6 +9,7 @@ import type {
   ScreeningFinding,
   Urgency,
 } from '../../db/types';
+import { today } from '../dates';
 import type { ParsedCase } from '../parser';
 import { deriveCaseStageFromDraft } from './deriveStage';
 
@@ -39,12 +40,14 @@ export function buildDraftFieldRows(
   text: string,
   parsed: ParsedCase,
   form: DraftFormSlice,
+  now: Date = new Date(),
 ): { stage: CaseStageKey; rows: DraftFieldRow[] } {
   const stage = deriveCaseStageFromDraft({
     text,
     parsed,
     destinationFacility: form.destinationFacility,
     reason: form.reason,
+    now: today(now),
   });
 
   const name = str(form.name) || parsed.name;

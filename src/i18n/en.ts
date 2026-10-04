@@ -284,10 +284,16 @@ export const en = {
   'new.editTitle': 'Edit case',
   'new.describe': 'Describe the case in your own words',
   'new.describeHint':
-    'Mention screening (area, finding, referral needed), patient details, and referral when relevant. CareLink fills the form for you to check.',
+    'Describe the patient, screening or referral, and what you know from the facility. CareLink fills the form for you to check.',
   'new.examples': 'Try an example',
   'new.examplesHint':
-    'Examples include screening (oral/breast/cervical/NCD), key finding, referral required, plus age, phone, village, and urgency.',
+    'Pick a language, then a demo case: new referral, tentative appointment, or follow-up due. Each case is written in that language.',
+  'new.demo.case1.title': 'Case 1 — Referral initiated',
+  'new.demo.case1.blurb': 'New patient registered today; referral sent; facility not yet confirmed.',
+  'new.demo.case2.title': 'Case 2 — Tentative appointment',
+  'new.demo.case2.blurb': 'CHC accepted; Tuesday possible but appointment not confirmed.',
+  'new.demo.case3.title': 'Case 3 — Follow-up due',
+  'new.demo.case3.blurb': 'Monday visit passed; accepted referral; attendance unknown.',
   'new.example.en': 'English',
   'new.example.hinglish': 'Hinglish',
   'new.example.hindi': 'हिंदी',

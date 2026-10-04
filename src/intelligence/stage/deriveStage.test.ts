@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { makePatient, makeReferral } from '../../db/factory';
 import { deriveFacts } from '../facts';
 import { parseFreeText } from '../parser';
+import { DEMO_CASE_TEXT } from '../demoCases';
+import { parseFreeText } from '../parser';
 import { deriveCaseStageFromDraft, deriveCaseStageSaved, getStageExpectations } from './deriveStage';
 
 const NOW = new Date(2026, 9, 4, 10, 0, 0);
+const DAY = '2026-10-04';
 const BRIEFING_HI =
   'मैंने कमला को आज जिला अस्पताल जाँच के लिए रेफर किया है। वह जाने के लिए तैयार है।';
 
@@ -18,6 +21,18 @@ describe('deriveCaseStageFromDraft', () => {
   it('returns initial_assessment without refer language or destination', () => {
     const parsed = parseFreeText('Patient has fever', NOW);
     expect(deriveCaseStageFromDraft({ text: 'Patient has fever', parsed })).toBe('initial_assessment');
+  });
+
+  it('demo case2 en → appointment_scheduled', () => {
+    const text = DEMO_CASE_TEXT.en.case2;
+    const parsed = parseFreeText(text, NOW);
+    expect(deriveCaseStageFromDraft({ text, parsed, now: DAY })).toBe('appointment_scheduled');
+  });
+
+  it('demo case3 en → follow_up_due', () => {
+    const text = DEMO_CASE_TEXT.en.case3;
+    const parsed = parseFreeText(text, NOW);
+    expect(deriveCaseStageFromDraft({ text, parsed, now: DAY })).toBe('follow_up_due');
   });
 });
 

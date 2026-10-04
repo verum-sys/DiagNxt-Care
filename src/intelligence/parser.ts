@@ -14,7 +14,9 @@ import type {
   Sex,
   Urgency,
 } from '../db/types';
-import { addDays, today as todayISO } from './dates';
+import { addDays, nearestWeekdayIso, today as todayISO, type WeekdayDirection } from './dates';
+
+export { EXAMPLES } from './demoCases';
 
 export interface ParsedCase {
   name?: string;
@@ -137,7 +139,10 @@ function cleanName(raw: string | undefined): string | undefined {
 
 const PLACE_STOPWORDS = /^(the|a|an|to|at|for|in|on)$/i;
 /** Relative-day words that sit next to facilities in Hinglish but are not place names. */
-const NOT_PLACE_PREFIX = /^(kal|aaj|aj|parso|yesterday|today|tomorrow|liye|ke|par|mein)$/i;
+const NOT_PLACE_PREFIX = /^(kal|aaj|aj|parso|yesterday|today|tomorrow|liye|ke|par|mein|unhe|unhein|unko|unki)$/i;
+
+const WEEKDAY_NAME_BLOCK =
+  /^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|somvar|somwar|mangalvar|mangalwar|budhvar|guruvar|shukravar|shanivar|ravivar|सोमवार|मंगलवार|बुधवार|गुरुवार|शुक्रवार|शनिवार|रविवार)$/i;
 
 function titlePlace(raw: string): string {
   if (!raw) return raw;
@@ -166,6 +171,8 @@ function spanFromMatch(m: RegExpMatchArray, field: ParsedField, group = 0): Fiel
 
 function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
   const patterns: { re: RegExp; group: number }[] = [
+    { re: /\bregistering\s+([A-Z][a-z]+)\b/, group: 1 },
+    { re: new RegExp(`([${DEV}]+)(?=\\s+का\\s+पंजीकरण)`), group: 1 },
     { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*\d/, group: 1 },
     { re: new RegExp(`^([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
     { re: /\b(?:name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
@@ -173,13 +180,14 @@ function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
     { re: /\b(?:Mrs\.?|Smt\.?|Mr\.?|Shri)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+ko\b/, group: 1 },
     { re: new RegExp(`(?:^|\\s)([${DEV}]+)\\s+को\\s`), group: 1 },
+    { re: new RegExp(`मैंने\\s+(?:कल\\s+)?([${DEV}]+)\\s*,`), group: 1 },
     { re: new RegExp(`मैंने\\s+([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
     { re: /^([A-Z][a-z]+)\b(?:,|\s+(?:is|was|aged|age|\d))/, group: 1 },
   ];
   for (const { re, group } of patterns) {
     const m = t.match(re);
     const n = cleanName(m?.[group]);
-    if (n && m) {
+    if (n && m && !WEEKDAY_NAME_BLOCK.test(n)) {
       const span = spanFromMatch(m, 'name', group);
       if (span) return { value: n, span };
     }
@@ -190,6 +198,8 @@ function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
 function extractAgeWithSpan(t: string): { value?: number; span?: FieldSpan } {
   const patterns = [
     /\b(\d{1,3})\s*(?:-|\s)?(?:years?(?:\s+old)?|yrs?|y\/o|yo|saal|sal)\b/i,
+    /\b(?:is|are)\s+(\d{1,3})\s+from\b/i,
+    /\b(\d{1,3})\s*,\s*from\b/i,
     /\bage[ds]?\s*(?:is\s*)?(\d{1,3})\b/i,
     /(\d{1,3})\s*(?:वर्ष|साल)/,
   ];
@@ -243,6 +253,14 @@ function extractLocalityWithSpan(t: string): { value?: string; span?: FieldSpan 
   if (m4) {
     return { value: m4[1], span: spanFromMatch(m4, 'locality', 1) };
   }
+  const m5 = t.match(/\bfrom\s+([A-Z][a-z]+)\s+village\b/i);
+  if (m5) {
+    return { value: m5[1], span: spanFromMatch(m5, 'locality', 1) };
+  }
+  const m6 = t.match(/\b([A-Z][a-z]+)\s+gaon\b/i);
+  if (m6) {
+    return { value: m6[1], span: spanFromMatch(m6, 'locality', 1) };
+  }
   return {};
 }
 
@@ -272,6 +290,10 @@ function extractReferralDateWithSpan(t: string, now: string): { value?: string; 
   if (parso && parso.index !== undefined) {
     return { value: addDays(now, -2), span: { field: 'referralDate', start: parso.index, end: parso.index + parso[0].length } };
   }
+  const twoWeeks = t.match(/\btwo weeks ago\b|\bdo hafte pehle\b|दो\s+हफ़?्ते\s+पहले/i);
+  if (twoWeeks && twoWeeks.index !== undefined) {
+    return { value: addDays(now, -14), span: { field: 'referralDate', start: twoWeeks.index, end: twoWeeks.index + twoWeeks[0].length } };
+  }
   const yest = t.match(/\byesterday\b|\bkal\b|कल/i);
   if (yest && yest.index !== undefined) {
     return { value: addDays(now, -1), span: { field: 'referralDate', start: yest.index, end: yest.index + yest[0].length } };
@@ -296,10 +318,58 @@ function extractReferralDateWithSpan(t: string, now: string): { value?: string; 
 }
 
 function isTentativeAppointmentContext(seg: string): boolean {
-  return /\b(probably|maybe|might|shayad|lagta|likely|शायद)\b/i.test(seg.slice(0, 120));
+  return (
+    /\b(probably|maybe|might|shayad|lagta|likely|शायद)\b/i.test(seg) ||
+    /\b(?:not\s+)?confirm(?:ed|ation)?\s+nahi\b|\bconfirm nahi hua\b|\babhi confirm nahi\b|\bnot confirmed\b/i.test(seg) ||
+    /पुष्टि\s+नहीं/i.test(seg)
+  );
+}
+
+const WEEKDAY_PATTERNS: { re: RegExp; index: number }[] = [
+  { re: /\b(?:on\s+)?Monday\b|\bsomvar\b|\bsomwar\b|सोमवार/i, index: 1 },
+  { re: /\b(?:on\s+)?Tuesday\b|\bmangalvar\b|\bmangalwar\b|मंगलवार/i, index: 2 },
+  { re: /\b(?:on\s+)?Wednesday\b|\bbudhvar\b|बुधवार/i, index: 3 },
+  { re: /\b(?:on\s+)?Thursday\b|\bguruvar\b|गुरुवार/i, index: 4 },
+  { re: /\b(?:on\s+)?Friday\b|\bshukravar\b|शुक्रवार/i, index: 5 },
+  { re: /\b(?:on\s+)?Saturday\b|\bshanivar\b|शनिवार/i, index: 6 },
+  { re: /\b(?:on\s+)?Sunday\b|\bravivar\b|रविवार/i, index: 0 },
+];
+
+function weekdayDirectionFromContext(t: string, matchIndex: number): WeekdayDirection {
+  const ctx = t.slice(Math.max(0, matchIndex - 50), Math.min(t.length, matchIndex + 100));
+  if (
+    /\b(?:was\s+supposed|had\s+to\s+go|jana\s+tha|jan[ae]\s+thi|going\s+to\s+go)\b|जाना\s+था|था\s*[,।]|pahunch|reached/i.test(
+      ctx,
+    )
+  ) {
+    return 'past';
+  }
+  return 'future';
+}
+
+function extractWeekdayAppointmentWithSpan(
+  t: string,
+  now: string,
+): { value?: string; span?: FieldSpan; tentative?: boolean } {
+  for (const { re, index } of WEEKDAY_PATTERNS) {
+    const m = t.match(re);
+    if (!m || m.index === undefined) continue;
+    const direction = weekdayDirectionFromContext(t, m.index);
+    const value = nearestWeekdayIso(index, now, direction);
+    const tentative = isTentativeAppointmentContext(t.slice(Math.max(0, m.index - 30), m.index + 120));
+    return {
+      value,
+      span: { field: 'appointmentDate', start: m.index, end: m.index + m[0].length },
+      tentative: tentative || undefined,
+    };
+  }
+  return {};
 }
 
 function extractAppointmentWithSpan(t: string, now: string): { value?: string; span?: FieldSpan; tentative?: boolean } {
+  const weekday = extractWeekdayAppointmentWithSpan(t, now);
+  if (weekday.value) return weekday;
+
   const head = t.search(/appointment|appt|tareekh|date|तारीख|अपॉइंटमेंट/i);
   if (head < 0) return {};
   const seg = t.slice(head);
@@ -340,7 +410,8 @@ function extractAppointmentWithSpan(t: string, now: string): { value?: string; s
   return {};
 }
 
-const REFER_DECISION_RE = /\b(?:referred|refer(?:ral|red| kiya| kiya hai| kar(?:a|)| kiye))\b|रेफर(?: किया)?/i;
+const REFER_DECISION_RE =
+  /\b(?:referred|referring|refer(?:ral|red| kiya| kiya tha| kiya hai| kar(?:a| rahi| raha|)| kiye))\b|रेफर(?: कर)?(?: किया)?/i;
 
 function extractReferralDecision(t: string): ReferralDecision | undefined {
   const scrubbed = t.replace(/\breferral\s+required\b/gi, 'ref needed');
@@ -378,13 +449,29 @@ function extractReasonWithSpan(t: string): { value?: string; span?: FieldSpan } 
     const hit = reasonFromForClause(en);
     if (hit?.value) return hit;
   }
-  const hing = t.match(/\b([a-z][a-z\s]{2,40}?)\s+ke\s+liye\b/i);
-  if (hing && hing.index !== undefined && !/\brefer\b/i.test(hing[1]) && !/\b(?:maine|chc|phc|hospital)\b/i.test(hing[1])) {
-    return { value: hing[1].trim(), span: { field: 'reason', start: hing.index, end: hing.index + hing[1].length } };
+  const hingRe = /\b([a-z]+(?:\s+[a-z]+){0,2})\s+ke\s+liye\b/gi;
+  let hing: RegExpExecArray | null;
+  let best: { value: string; span: FieldSpan } | undefined;
+  while ((hing = hingRe.exec(t)) !== null) {
+    let phrase = hing[1].trim();
+    phrase = phrase.replace(/^(?:maine|unhe|unko|unhein|unki)\s+/i, '').trim();
+    if (!phrase) continue;
+    if (/\brefer\b/i.test(phrase)) continue;
+    if (/^(?:maine|chc|phc)\b/i.test(phrase)) continue;
+    if (/\bhospital\b/i.test(phrase)) continue;
+    const hit = {
+      value: phrase,
+      span: { field: 'reason' as const, start: hing.index, end: hing.index + hing[1].length },
+    };
+    if (!best || phrase.length < best.value.length) best = hit;
   }
-  const dev = t.match(new RegExp(`([${DEV}][${DEV}\\s]{1,40}?)\\s+के\\s+लिए`));
-  if (dev && dev.index !== undefined) {
-    return { value: dev[1].trim(), span: { field: 'reason', start: dev.index, end: dev.index + dev[1].length } };
+  if (best) return best;
+  const devShort = t.match(new RegExp(`([${DEV}]{1,16})\\s+के\\s+लिए`));
+  if (devShort && devShort.index !== undefined) {
+    return {
+      value: devShort[1].trim(),
+      span: { field: 'reason', start: devShort.index, end: devShort.index + devShort[1].length },
+    };
   }
   return {};
 }
@@ -488,7 +575,9 @@ function extractReferralRequiredWithSpan(t: string): { value?: ReferralRequiredA
 }
 
 function extractFacilityAcceptedWithSpan(t: string): { accepted: boolean; span?: FieldSpan } {
-  const m = t.match(/\b(?:hospital|facility|they) (?:has |have )?(?:accepted|confirmed)\b|\baccept kar liya\b|स्वीकार कर/i);
+  const m = t.match(
+    /\b(?:has|have|had)\s+accepted\s+the\s+referral\b|\b(?:hospital|facility|CHC|they)\s+(?:has |have |had )?(?:accepted|confirmed)\b|\b(?:referral\s+)?accept(?:ed| kar liya(?: hai| tha)?)\b|\baccept kar liya\b|स्वीकार\s+(?:कर\s+)?(?:लिया|किया)(?:\s+था)?/i,
+  );
   if (m && m.index !== undefined) {
     return { accepted: true, span: { field: 'facilityResponse', start: m.index, end: m.index + m[0].length } };
   }
@@ -614,10 +703,3 @@ export function fieldStates(p: ParsedCase): Record<ParsedField, 'known' | 'unkno
   };
 }
 
-export const EXAMPLES = {
-  en: "Oral screening completed for Mrs Mary Sharma, 38 years, from House 12 Rampur village, phone 98765 43210. Key finding positive, referral required yes. I referred her to Sadar district hospital yesterday for urgent follow-up. She said she would go, but I haven't heard anything from the hospital yet.",
-  hinglish:
-    'Sunita Devi, 42 saal, mahila, Rampur gaon house 45, phone 9876543210. Breast screening completed — key finding needs review, referral required yes. Maine kal Bero CHC refer kiya, urgent TB check ke liye. Woh jayegi, par hospital se abhi koi jawab nahi aaya.',
-  hindi:
-    'सुनीता देवी, 42 saal, mahila, Rampur gaon makan 12, phone 9876543210. Cervical screening completed, key finding negative, referral required no. Woh jayegi, lekin hospital se abhi koi jawab nahi aaya.',
-};

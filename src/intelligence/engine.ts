@@ -53,7 +53,11 @@ function deriveCareState(p: Patient, r: Referral, f: EffectiveFacts, now: string
   if (f.attendance?.value === 'not_attended') return 'not_attended';
   if (f.response?.value === 'declined') return 'declined';
   if (f.response?.value === 'info_requested') return 'info_requested';
-  if (f.appointment) return f.appointment.value < now ? 'appt_passed_unknown' : 'scheduled';
+  const workerApptTentative =
+    r.worker.appointmentCertainty === 'tentative' && f.appointment?.source === 'worker';
+  if (f.appointment && !workerApptTentative) {
+    return f.appointment.value < now ? 'appt_passed_unknown' : 'scheduled';
+  }
   if (f.response?.value === 'accepted') return 'accepted_no_appt';
   if (!f.sentToFacility) return 'not_sent';
   return 'awaiting_facility';
