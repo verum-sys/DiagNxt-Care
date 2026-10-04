@@ -17,10 +17,13 @@ export interface Patient {
   syncStatus: SyncStatus;
 }
 
+export type AppointmentCertainty = 'confirmed' | 'tentative';
+
 /** Facts the frontline worker learned themselves (phone call, home visit). Owned by the frontline device. */
 export interface WorkerFacts {
   facilityResponse?: FacilityResponse;
   appointmentDate?: string;
+  appointmentCertainty?: AppointmentCertainty;
   attendance?: Attendance;
   outcomeRecorded?: boolean;
   outcomeNote?: string;
@@ -53,6 +56,7 @@ export interface Referral {
   urgency: Urgency;
   notes: string;
   patientIntention?: Intention;
+  screening?: ScreeningInfo;
   worker: WorkerFacts;
   facility: FacilityFacts;
   createdAt: string;
@@ -109,6 +113,75 @@ export interface FacilityEvent {
   at: string;
   kind: 'acknowledged' | 'accepted' | 'declined' | 'info_requested' | 'scheduled' | 'attended' | 'not_attended' | 'completed' | 'note';
   text?: string;
+}
+
+// ---------- Case stage (briefing workflow; distinct from CareStateKey until UI merge) ----------
+
+export type CaseStageKey =
+  | 'initial_assessment'
+  | 'initial_care_no_referral'
+  | 'referral_initiated'
+  | 'referral_accepted'
+  | 'appointment_scheduled'
+  | 'follow_up_due'
+  | 'completed';
+
+export type FieldDisplayStatus =
+  | 'known'
+  | 'tentative'
+  | 'pending'
+  | 'unknown'
+  | 'not_applicable'
+  | 'completed'
+  | 'missed'
+  | 'not_assessed';
+
+export type ReferralDecision = 'referred' | 'none';
+
+export type ScreeningArea = 'oral' | 'breast' | 'cervical' | 'ncd';
+export type ScreeningFinding = 'positive' | 'negative' | 'needs_review';
+export type ReferralRequiredAnswer = 'yes' | 'no';
+
+/** Frontline screening at first contact (before or alongside referral). */
+export interface ScreeningInfo {
+  completed: boolean;
+  area?: ScreeningArea;
+  finding?: ScreeningFinding;
+  referralRequired?: ReferralRequiredAnswer;
+}
+
+export type DraftFieldKey =
+  | 'caseStage'
+  | 'referralDecision'
+  | 'screeningCompleted'
+  | 'screeningArea'
+  | 'screeningFinding'
+  | 'referralRequired'
+  | 'name'
+  | 'age'
+  | 'phone'
+  | 'locality'
+  | 'reason'
+  | 'destinationFacility'
+  | 'referralDate'
+  | 'urgency'
+  | 'facilityResponse'
+  | 'appointmentDate'
+  | 'attendance'
+  | 'patientIntention';
+
+export interface DraftFieldRow {
+  key: DraftFieldKey;
+  labelKey: string;
+  displayValue?: string;
+  displayValueKey?: string;
+  status: FieldDisplayStatus;
+}
+
+export interface StageExpectations {
+  complete: DraftFieldKey[];
+  pending: DraftFieldKey[];
+  notApplicable: DraftFieldKey[];
 }
 
 // ---------- Intelligence ----------

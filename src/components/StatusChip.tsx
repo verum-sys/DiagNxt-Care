@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { CareStateKey, SyncStatus } from '../db/types';
+import type { CareStateKey, CaseStageKey, FieldDisplayStatus, SyncStatus } from '../db/types';
 import { useLang } from '../i18n';
 import { Icon } from './Icon';
 
@@ -54,6 +54,27 @@ export function SyncChip({ status }: { status: SyncStatus }) {
       {t('chip.synced')}
     </Chip>
   );
+}
+
+const FIELD_STATUS_TONE: Record<FieldDisplayStatus, Tone> = {
+  known: 'ok',
+  tentative: 'warn',
+  pending: 'info',
+  unknown: 'warn',
+  not_applicable: 'neutral',
+  completed: 'ok',
+  missed: 'danger',
+  not_assessed: 'neutral',
+};
+
+export function FieldStatusChip({ status }: { status: FieldDisplayStatus }) {
+  const { t } = useLang();
+  return <Chip tone={FIELD_STATUS_TONE[status]}>{t(`fieldStatus.${status}`)}</Chip>;
+}
+
+export function CaseStageChip({ stage }: { stage: CaseStageKey }) {
+  const { t } = useLang();
+  return <Chip tone="brand">{t(`caseStage.${stage}`)}</Chip>;
 }
 
 export function DueChip({ days, waiting }: { days?: number; waiting?: boolean }) {

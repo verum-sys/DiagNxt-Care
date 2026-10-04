@@ -6,6 +6,7 @@ import { getDB, getMeta, notifyChange, setMeta, uid } from './db';
 import { emptyFacility } from './factory';
 import type {
   ActionKey,
+  AppointmentCertainty,
   FacilityEvent,
   FacilityResponse,
   FollowUp,
@@ -68,8 +69,8 @@ export async function getCase(referralId: string): Promise<CaseRecord | undefine
 export type PatientDraft = Pick<Patient, 'name' | 'age' | 'sex' | 'phone' | 'locality'>;
 export type ReferralDraft = Pick<
   Referral,
-  'reason' | 'destinationFacility' | 'referralDate' | 'urgency' | 'notes' | 'patientIntention'
-> & { appointmentDate?: string; facilityResponse?: FacilityResponse };
+  'reason' | 'destinationFacility' | 'referralDate' | 'urgency' | 'notes' | 'patientIntention' | 'screening'
+> & { appointmentDate?: string; facilityResponse?: FacilityResponse; appointmentCertainty?: AppointmentCertainty };
 
 export async function createCase(p: PatientDraft, r: ReferralDraft, referringWorker: string): Promise<string> {
   const db = await getDB();
@@ -77,13 +78,17 @@ export async function createCase(p: PatientDraft, r: ReferralDraft, referringWor
   const patientId = await nextId('patient');
   const referralId = await nextId('referral');
   const patient: Patient = { ...p, id: patientId, createdAt: now, updatedAt: now, syncStatus: 'pending' };
-  const { appointmentDate, facilityResponse, ...rest } = r;
+  const { appointmentDate, facilityResponse, appointmentCertainty, ...rest } = r;
   const referral: Referral = {
     ...rest,
     id: referralId,
     patientId,
     referringWorker,
-    worker: { appointmentDate: appointmentDate || undefined, facilityResponse },
+    worker: {
+      appointmentDate: appointmentDate || undefined,
+      facilityResponse,
+      appointmentCertainty,
+    },
     facility: emptyFacility(),
     createdAt: now,
     updatedAt: now,

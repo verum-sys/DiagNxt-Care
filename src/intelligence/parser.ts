@@ -5,7 +5,15 @@
  * The output is a *draft*: every field carries Known/Unknown so the worker confirms or corrects it.
  * Anything not understood is shown as Unknown rather than guessed.
  */
-import type { Intention, Sex, Urgency } from '../db/types';
+import type {
+  Intention,
+  ReferralDecision,
+  ReferralRequiredAnswer,
+  ScreeningArea,
+  ScreeningFinding,
+  Sex,
+  Urgency,
+} from '../db/types';
 import { addDays, today as todayISO } from './dates';
 
 export interface ParsedCase {
@@ -24,9 +32,20 @@ export interface ParsedCase {
   facilityNotHeard: boolean;
   /** True when the note says the facility accepted / confirmed. */
   facilityAccepted: boolean;
+  referralDecision?: ReferralDecision;
+  /** Set when appointment language is tentative (probably, shayad, etc.). */
+  appointmentTentative?: boolean;
+  screeningCompleted?: boolean;
+  screeningArea?: ScreeningArea;
+  screeningFinding?: ScreeningFinding;
+  referralRequired?: ReferralRequiredAnswer;
 }
 
 export type ParsedField =
+  | 'screeningCompleted'
+  | 'screeningArea'
+  | 'screeningFinding'
+  | 'referralRequired'
   | 'name'
   | 'age'
   | 'phone'
@@ -41,6 +60,10 @@ export type ParsedField =
   | 'patientIntention';
 
 export const PARSED_FIELDS: ParsedField[] = [
+  'screeningCompleted',
+  'screeningArea',
+  'screeningFinding',
+  'referralRequired',
   'name',
   'age',
   'phone',
@@ -54,6 +77,19 @@ export const PARSED_FIELDS: ParsedField[] = [
   'attendance',
   'patientIntention',
 ];
+
+export interface FieldSpan {
+  field: ParsedField;
+  start: number;
+  end: number;
+}
+
+export interface ParseResult {
+  case: ParsedCase;
+  spans: FieldSpan[];
+  /** Normalized text spans refer to (whitespace collapsed, trimmed). */
+  text: string;
+}
 
 const DEV = 'ऀ-ॿ';
 
@@ -72,6 +108,26 @@ const NOT_NAMES = new Set([
   'मैंने', 'उस', 'उसको', 'उन्हें', 'उनको', 'वह', 'मरीज', 'मरीज़', 'अस्पताल', 'डॉक्टर', 'आज', 'कल',
 ]);
 
+/** Lower number = wins on tie after length sort. */
+const SPAN_FIELD_PRIORITY: Record<ParsedField, number> = {
+  destinationFacility: 1,
+  name: 2,
+  referralDate: 3,
+  appointmentDate: 4,
+  reason: 5,
+  age: 6,
+  phone: 7,
+  locality: 8,
+  urgency: 9,
+  patientIntention: 10,
+  facilityResponse: 11,
+  attendance: 12,
+  screeningCompleted: 13,
+  screeningArea: 14,
+  screeningFinding: 15,
+  referralRequired: 16,
+};
+
 function cleanName(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const n = raw.trim().replace(/[.,;:]$/, '');
@@ -79,150 +135,470 @@ function cleanName(raw: string | undefined): string | undefined {
   return n;
 }
 
-function extractName(t: string): string | undefined {
-  const patterns: RegExp[] = [
-    /\b(?:name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/,
-    /\b[Rr]eferred\s+(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/,
-    /\b(?:Mrs\.?|Smt\.?|Mr\.?|Shri)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/,
-    /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+ko\b/,
-    new RegExp(`(?:^|\\s)([${DEV}]+)\\s+को\\s`),
-    /^([A-Z][a-z]+)\b(?:,|\s+(?:is|was|aged|age|\d))/,
+const PLACE_STOPWORDS = /^(the|a|an|to|at|for|in|on)$/i;
+/** Relative-day words that sit next to facilities in Hinglish but are not place names. */
+const NOT_PLACE_PREFIX = /^(kal|aaj|aj|parso|yesterday|today|tomorrow|liye|ke|par|mein)$/i;
+
+function titlePlace(raw: string): string {
+  if (!raw) return raw;
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
+/** Word immediately before a facility phrase, e.g. "sadar" in "sadar district hospital". */
+function placePrefixBefore(t: string, facilityIndex: number): { place: string; spanLen: number } | undefined {
+  const before = t.slice(0, facilityIndex).match(/\b([A-Za-z]{2,})\s+$/);
+  if (!before) return undefined;
+  const raw = before[1];
+  const place = titlePlace(raw);
+  if (NOT_NAMES.has(raw) || NOT_NAMES.has(place) || PLACE_STOPWORDS.test(raw) || NOT_PLACE_PREFIX.test(raw)) return undefined;
+  return { place, spanLen: before[0].length };
+}
+
+function spanFromMatch(m: RegExpMatchArray, field: ParsedField, group = 0): FieldSpan | undefined {
+  if (m.index === undefined) return undefined;
+  const slice = group === 0 ? m[0] : m[group];
+  if (!slice) return undefined;
+  const off = group === 0 ? 0 : m[0].indexOf(slice);
+  if (off < 0) return undefined;
+  const start = m.index + off;
+  return { field, start, end: start + slice.length };
+}
+
+function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
+  const patterns: { re: RegExp; group: number }[] = [
+    { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*\d/, group: 1 },
+    { re: new RegExp(`^([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
+    { re: /\b(?:name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
+    { re: /\b[Rr]eferred\s+(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
+    { re: /\b(?:Mrs\.?|Smt\.?|Mr\.?|Shri)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
+    { re: /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+ko\b/, group: 1 },
+    { re: new RegExp(`(?:^|\\s)([${DEV}]+)\\s+को\\s`), group: 1 },
+    { re: new RegExp(`मैंने\\s+([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
+    { re: /^([A-Z][a-z]+)\b(?:,|\s+(?:is|was|aged|age|\d))/, group: 1 },
+  ];
+  for (const { re, group } of patterns) {
+    const m = t.match(re);
+    const n = cleanName(m?.[group]);
+    if (n && m) {
+      const span = spanFromMatch(m, 'name', group);
+      if (span) return { value: n, span };
+    }
+  }
+  return {};
+}
+
+function extractAgeWithSpan(t: string): { value?: number; span?: FieldSpan } {
+  const patterns = [
+    /\b(\d{1,3})\s*(?:-|\s)?(?:years?(?:\s+old)?|yrs?|y\/o|yo|saal|sal)\b/i,
+    /\bage[ds]?\s*(?:is\s*)?(\d{1,3})\b/i,
+    /(\d{1,3})\s*(?:वर्ष|साल)/,
   ];
   for (const re of patterns) {
     const m = t.match(re);
-    const n = cleanName(m?.[1]);
-    if (n) return n;
+    if (m) {
+      const span = spanFromMatch(m, 'age', 0);
+      return { value: Number(m[1]), span };
+    }
   }
+  return {};
+}
+
+/** Mr / Mrs / Smt etc. next to a name — common in referral notes without pronouns. */
+function extractSexFromHonorific(t: string): Sex | undefined {
+  if (/\b(?:Mrs|Ms|Miss|Smt)\.?\s+(?:[A-Z][a-z]+|[\u0900-\u097F])/i.test(t)) return 'F';
+  if (/\b(?:Mr|Shri)\.?\s+(?:[A-Z][a-z]+|[\u0900-\u097F])/i.test(t)) return 'M';
   return undefined;
 }
 
-function extractAge(t: string): number | undefined {
-  const m =
-    t.match(/\b(\d{1,3})\s*(?:-|\s)?(?:years?(?:\s+old)?|yrs?|y\/o|yo|saal|sal)\b/i) ||
-    t.match(/\bage[ds]?\s*(?:is\s*)?(\d{1,3})\b/i) ||
-    t.match(/(\d{1,3})\s*(?:वर्ष|साल)/);
-  return m ? Number(m[1]) : undefined;
-}
-
 function extractSex(t: string): Sex | undefined {
+  const fromTitle = extractSexFromHonorific(t);
+  if (fromTitle) return fromTitle;
   if (/\b(she|her|woman|female|girl|mahila|ladki|jayegi|gayi|aayegi)\b|महिला|लड़की|जाएगी|गई|आएगी/i.test(t)) return 'F';
   if (/\b(he|his|him|man|male|boy|purush|ladka|jayega|gaya|aayega)\b|पुरुष|लड़का|जाएगा|गया|आएगा/i.test(t)) return 'M';
   return undefined;
 }
 
-function extractPhone(t: string): string | undefined {
-  const compact = t.replace(/(\d)[\s-](?=\d)/g, '$1');
-  const m = compact.match(/(?:\+?91)?([6-9]\d{9})\b/);
-  return m ? m[1] : undefined;
+function extractPhoneWithSpan(t: string): { value?: string; span?: FieldSpan } {
+  const m = t.match(/(?:\+?91[\s-]?)?([6-9]\d(?:[\s-]?\d){8})\b/);
+  if (!m) return {};
+  const digits = m[1].replace(/[\s-]/g, '');
+  const span = spanFromMatch(m, 'phone', 0);
+  return { value: digits, span };
 }
 
-function extractLocality(t: string): string | undefined {
-  const m =
-    t.match(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+(?:village|gaon|gaanv|gaav)\b/) ||
-    t.match(/\b(?:village|gaon)\s+([A-Z][a-z]+)/i) ||
-    t.match(/\bfrom\s+([A-Z][a-z]+)(?!\s+(?:hospital|District|CHC|PHC))/) ||
-    t.match(new RegExp(`([${DEV}]+)\\s+(?:गाँव|गांव)`));
-  return m ? m[1] : undefined;
+function extractLocalityWithSpan(t: string): { value?: string; span?: FieldSpan } {
+  const m1 = t.match(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+(?:village|gaon|gaanv|gaav)\b/);
+  if (m1) {
+    return { value: m1[1], span: spanFromMatch(m1, 'locality', 0) };
+  }
+  const m2 = t.match(/\b(?:village|gaon)\s+([A-Z][a-z]+)/i);
+  if (m2) {
+    return { value: m2[1], span: spanFromMatch(m2, 'locality', 0) };
+  }
+  const m3 = t.match(/\bfrom\s+([A-Z][a-z]+)(?!\s+(?:hospital|District|CHC|PHC))/);
+  if (m3) {
+    return { value: m3[1], span: spanFromMatch(m3, 'locality', 1) };
+  }
+  const m4 = t.match(new RegExp(`([${DEV}]+)\\s+(?:गाँव|गांव)`));
+  if (m4) {
+    return { value: m4[1], span: spanFromMatch(m4, 'locality', 1) };
+  }
+  return {};
 }
 
-function extractFacility(t: string): string | undefined {
+function extractFacilityWithSpan(t: string): { value?: string; span?: FieldSpan } {
   for (const f of FACILITIES) {
     const m = t.match(f.re);
-    if (!m) continue;
-    // Keep a place name in front of it, e.g. "Sitapur District Hospital".
-    const before = t.slice(0, m.index).match(/\b([A-Z][a-z]{2,})\s+$/);
-    if (before && !NOT_NAMES.has(before[1]) && !/^(The|A|An|To|At)$/.test(before[1])) return `${before[1]} ${f.name}`;
-    return f.name;
+    if (!m || m.index === undefined) continue;
+    const prefix = placePrefixBefore(t, m.index);
+    let start = m.index;
+    const end = m.index + m[0].length;
+    let value = f.name;
+    if (prefix) {
+      value = `${prefix.place} ${f.name}`;
+      start = m.index - prefix.spanLen;
+    }
+    return { value, span: { field: 'destinationFacility', start, end } };
   }
-  return undefined;
+  return {};
 }
 
-/** Past date the referral was made, from relative expressions. */
-function extractReferralDate(t: string, now: string): string | undefined {
+function extractReferralDateWithSpan(t: string, now: string): { value?: string; span?: FieldSpan } {
   const n = t.match(/\b(\d{1,2})\s+days?\s+ago\b|\b(\d{1,2})\s+din\s+(?:pehle|pahle)\b/i) || t.match(/(\d{1,2})\s+दिन\s+पहले/);
-  if (n) return addDays(now, -Number(n[1] ?? n[2]));
-  if (/\bday before yesterday\b|\bparso\b|परसों/i.test(t)) return addDays(now, -2);
-  if (/\byesterday\b|\bkal\b|कल/i.test(t)) return addDays(now, -1);
-  if (/\blast week\b|\bpichhle hafte\b|\bpichle hafte\b|पिछले हफ़?्ते/i.test(t)) return addDays(now, -7);
-  if (/\btoday\b|\baaj\b|आज/i.test(t)) return now;
-  const d = t.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/);
-  if (d) {
-    const y = d[3].length === 2 ? 2000 + Number(d[3]) : Number(d[3]);
-    return `${y}-${String(d[2]).padStart(2, '0')}-${String(d[1]).padStart(2, '0')}`;
+  if (n && n.index !== undefined) {
+    return { value: addDays(now, -Number(n[1] ?? n[2])), span: { field: 'referralDate', start: n.index, end: n.index + n[0].length } };
   }
-  return undefined;
+  const parso = t.match(/\bday before yesterday\b|\bparso\b|परसों/i);
+  if (parso && parso.index !== undefined) {
+    return { value: addDays(now, -2), span: { field: 'referralDate', start: parso.index, end: parso.index + parso[0].length } };
+  }
+  const yest = t.match(/\byesterday\b|\bkal\b|कल/i);
+  if (yest && yest.index !== undefined) {
+    return { value: addDays(now, -1), span: { field: 'referralDate', start: yest.index, end: yest.index + yest[0].length } };
+  }
+  const week = t.match(/\blast week\b|\bpichhle hafte\b|\bpichle hafte\b|पिछले हफ़?्ते/i);
+  if (week && week.index !== undefined) {
+    return { value: addDays(now, -7), span: { field: 'referralDate', start: week.index, end: week.index + week[0].length } };
+  }
+  const todayM = t.match(/\btoday\b|\baaj\b|आज/i);
+  if (todayM && todayM.index !== undefined) {
+    return { value: now, span: { field: 'referralDate', start: todayM.index, end: todayM.index + todayM[0].length } };
+  }
+  const d = t.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/);
+  if (d && d.index !== undefined) {
+    const y = d[3].length === 2 ? 2000 + Number(d[3]) : Number(d[3]);
+    return {
+      value: `${y}-${String(d[2]).padStart(2, '0')}-${String(d[1]).padStart(2, '0')}`,
+      span: { field: 'referralDate', start: d.index, end: d.index + d[0].length },
+    };
+  }
+  return {};
 }
 
-function extractAppointment(t: string, now: string): string | undefined {
-  if (!/\bappointment\b|\bappt\b|\btareekh\b|\bdate (?:is|given)\b|तारीख|अपॉइंटमेंट/i.test(t)) return undefined;
-  const seg = t.slice(t.search(/appointment|appt|tareekh|date|तारीख|अपॉइंटमेंट/i));
+function isTentativeAppointmentContext(seg: string): boolean {
+  return /\b(probably|maybe|might|shayad|lagta|likely|शायद)\b/i.test(seg.slice(0, 120));
+}
+
+function extractAppointmentWithSpan(t: string, now: string): { value?: string; span?: FieldSpan; tentative?: boolean } {
+  const head = t.search(/appointment|appt|tareekh|date|तारीख|अपॉइंटमेंट/i);
+  if (head < 0) return {};
+  const seg = t.slice(head);
+  const base = head;
+  const tentative = isTentativeAppointmentContext(seg);
   const inN = seg.match(/\bin\s+(\d{1,2})\s+days?\b/i);
-  if (inN) return addDays(now, Number(inN[1]));
-  if (/\btomorrow\b/i.test(seg)) return addDays(now, 1);
-  if (/\bnext week\b|\bagle hafte\b/i.test(seg)) return addDays(now, 7);
-  if (/\btoday\b|\baaj\b|आज/i.test(seg)) return now;
+  if (inN && inN.index !== undefined) {
+    return {
+      value: addDays(now, Number(inN[1])),
+      span: { field: 'appointmentDate', start: base + inN.index, end: base + inN.index + inN[0].length },
+      tentative: tentative || undefined,
+    };
+  }
+  const tom = seg.match(/\btomorrow\b/i);
+  if (tom && tom.index !== undefined) {
+    return {
+      value: addDays(now, 1),
+      span: { field: 'appointmentDate', start: base + tom.index, end: base + tom.index + tom[0].length },
+      tentative: tentative || undefined,
+    };
+  }
+  const nw = seg.match(/\bnext week\b|\bagle hafte\b/i);
+  if (nw && nw.index !== undefined) {
+    return {
+      value: addDays(now, 7),
+      span: { field: 'appointmentDate', start: base + nw.index, end: base + nw.index + nw[0].length },
+      tentative: tentative || undefined,
+    };
+  }
+  const td = seg.match(/\btoday\b|\baaj\b|आज/i);
+  if (td && td.index !== undefined) {
+    return {
+      value: now,
+      span: { field: 'appointmentDate', start: base + td.index, end: base + td.index + td[0].length },
+      tentative: tentative || undefined,
+    };
+  }
+  return {};
+}
+
+const REFER_DECISION_RE = /\b(?:referred|refer(?:ral|red| kiya| kiya hai| kar(?:a|)| kiye))\b|रेफर(?: किया)?/i;
+
+function extractReferralDecision(t: string): ReferralDecision | undefined {
+  const scrubbed = t.replace(/\breferral\s+required\b/gi, 'ref needed');
+  if (REFER_DECISION_RE.test(scrubbed)) return 'referred';
   return undefined;
 }
 
-function extractUrgency(t: string): Urgency | undefined {
-  if (/\burgent(?:ly)?\b|\bemergency\b|\bturant\b|\bimmediately\b|\bas soon as possible\b|तुरंत|फ़?ौरन/i.test(t)) return 'urgent';
-  if (/\bsoon\b|\bthis week\b|\bjaldi\b|जल्दी/i.test(t)) return 'soon';
-  if (/\broutine\b|\bno hurry\b/i.test(t)) return 'routine';
-  return undefined;
+function extractUrgencyWithSpan(t: string): { value?: Urgency; span?: FieldSpan } {
+  const urgent = t.match(/\burgent(?:ly)?\b|\bemergency\b|\bturant\b|\btatkal\b|\bimmediately\b|\bas soon as possible\b|तुरंत|तत्काल|फ़?ौरन/i);
+  if (urgent && urgent.index !== undefined) return { value: 'urgent', span: { field: 'urgency', start: urgent.index, end: urgent.index + urgent[0].length } };
+  const soon = t.match(/\bsoon\b|\bthis week\b|\bjaldi\b|जल्दी/i);
+  if (soon && soon.index !== undefined) return { value: 'soon', span: { field: 'urgency', start: soon.index, end: soon.index + soon[0].length } };
+  const routine = t.match(/\broutine\b|\bno hurry\b/i);
+  if (routine && routine.index !== undefined) return { value: 'routine', span: { field: 'urgency', start: routine.index, end: routine.index + routine[0].length } };
+  return {};
 }
 
-function extractReason(t: string): string | undefined {
-  const en = t.match(
-    /\b(?:for|because of|due to)\s+(?!(?:the|a)\s+(?:hospital|reply|response)|\d+\s+days?|her|him|them|it\b)(.{3,60}?)(?=[.,;!?]|\s+(?:yesterday|today|and|but|she|he|to the|at the|on)\b|$)/i,
-  );
-  if (en) return en[1].replace(/^(a|an|the)\s+/i, '').trim();
+function reasonFromForClause(en: RegExpExecArray): { value?: string; span?: FieldSpan } | undefined {
+  if (!en[1] || en.index === undefined) return undefined;
+  const raw = en[1];
+  const trimmed = raw.replace(/^(a|an|the)\s+/i, '').trim();
+  if (/^(Mrs|Mr|Ms|Miss|Dr)\.?\s+/i.test(trimmed)) return undefined;
+  if (/^\d+\s+years?/i.test(trimmed) || /^House\s+\d/i.test(trimmed)) return undefined;
+  const articleLen = raw.length - trimmed.length;
+  const off = en[0].indexOf(en[1]);
+  const start = en.index + off + articleLen;
+  return { value: trimmed, span: { field: 'reason', start, end: start + trimmed.length } };
+}
+
+function extractReasonWithSpan(t: string): { value?: string; span?: FieldSpan } {
+  const enRe =
+    /\b(?:for|because of|due to)\s+(?!(?:the|a)\s+(?:hospital|reply|response)|\d+\s+days?|her|him|them|it\b)(.{3,60}?)(?=[.,;!?]|\s+(?:yesterday|today|and|but|she|he|to the|at the|on)\b|$)/gi;
+  let en: RegExpExecArray | null;
+  while ((en = enRe.exec(t)) !== null) {
+    const hit = reasonFromForClause(en);
+    if (hit?.value) return hit;
+  }
   const hing = t.match(/\b([a-z][a-z\s]{2,40}?)\s+ke\s+liye\b/i);
-  if (hing && !/\brefer\b/i.test(hing[1])) return hing[1].trim();
+  if (hing && hing.index !== undefined && !/\brefer\b/i.test(hing[1]) && !/\b(?:maine|chc|phc|hospital)\b/i.test(hing[1])) {
+    return { value: hing[1].trim(), span: { field: 'reason', start: hing.index, end: hing.index + hing[1].length } };
+  }
   const dev = t.match(new RegExp(`([${DEV}][${DEV}\\s]{1,40}?)\\s+के\\s+लिए`));
-  if (dev) return dev[1].trim();
-  return undefined;
+  if (dev && dev.index !== undefined) {
+    return { value: dev[1].trim(), span: { field: 'reason', start: dev.index, end: dev.index + dev[1].length } };
+  }
+  return {};
 }
 
-function extractIntention(t: string): Intention | undefined {
-  if (/\b(?:refused|won['’]?t go|will not go|doesn['’]?t want to go|not going|nahi jayegi|nahi jayega|nahin jayegi)\b|नहीं जाएगी|नहीं जाएगा|मना कर/i.test(t))
-    return 'will_not_attend';
-  if (/\b(?:not sure|unsure|maybe|might go|pata nahi|soch rahi)\b|पता नहीं|शायद/i.test(t)) return 'unsure';
-  if (
-    /\b(?:would go|will go|agreed to go|plans? to go|going to go|ready to go|said (?:she|he)(?:['’]d| would| will) go|will attend|jayegi|jayega|jaane ko taiyar)\b|जाएगी|जाएगा|जाने को तैयार/i.test(
-      t,
-    )
-  )
-    return 'will_attend';
-  return undefined;
+function extractIntentionWithSpan(t: string): { value?: Intention; span?: FieldSpan } {
+  const neg = t.match(
+    /\b(?:refused|won['’]?t go|will not go|doesn['’]?t want to go|not going|nahi jayegi|nahi jayega|nahin jayegi)\b|नहीं जाएगी|नहीं जाएगा|मना कर/i,
+  );
+  if (neg && neg.index !== undefined) {
+    return { value: 'will_not_attend', span: { field: 'patientIntention', start: neg.index, end: neg.index + neg[0].length } };
+  }
+  const unsure = t.match(/\b(?:not sure|unsure|maybe|might go|pata nahi|soch rahi)\b|पता नहीं|शायद/i);
+  if (unsure && unsure.index !== undefined) {
+    return { value: 'unsure', span: { field: 'patientIntention', start: unsure.index, end: unsure.index + unsure[0].length } };
+  }
+  const pos = t.match(
+    /\b(?:would go|will go|agreed to go|plans? to go|going to go|ready to go|said (?:she|he)(?:['’]d| would| will) go|will attend|jayegi|jayega|jaane ko taiyar)\b|जाएगी|जाएगा|जाने को तैयार|जाने के लिए तैयार/i,
+  );
+  if (pos && pos.index !== undefined) {
+    return { value: 'will_attend', span: { field: 'patientIntention', start: pos.index, end: pos.index + pos[0].length } };
+  }
+  return {};
+}
+
+function screeningDoneWordSpan(m: RegExpMatchArray): FieldSpan | undefined {
+  if (m.index === undefined) return undefined;
+  const word = m[1] ?? m[0].match(/\b(completed|done|complete|poori|puri)\b/i)?.[0];
+  if (!word) return { field: 'screeningCompleted', start: m.index, end: m.index + m[0].length };
+  const off = m[0].toLowerCase().indexOf(word.toLowerCase());
+  const start = m.index + (off >= 0 ? off : 0);
+  return { field: 'screeningCompleted', start, end: start + word.length };
+}
+
+function extractScreeningCompletedWithSpan(t: string): { value?: boolean; span?: FieldSpan } {
+  const areaFirst = t.match(/\b(?:oral|breast|cervical|ncd)\s+screening\s+(completed|done|complete)\b/i);
+  if (areaFirst) {
+    const span = screeningDoneWordSpan(areaFirst);
+    if (span) return { value: true, span };
+  }
+  const m = t.match(
+    /\b(?:screening|janch|jaanch|checkup)\s+(completed|done|complete|poori|puri|ho gayi|ho gaya)\b|\b(?:completed|done)\s+(?:oral|breast|cervical|ncd|the)\s+screening\b|स्क्रीनिंग\s+(?:पूरी|पूरा|हो गई)|जाँच\s+पूरी/i,
+  );
+  if (m && m.index !== undefined) {
+    const span = screeningDoneWordSpan(m);
+    if (span) return { value: true, span };
+  }
+  if (/\b(?:oral|breast|cervical|ncd)\s+screening\b/i.test(t) && /\b(?:key finding|finding|result)\b/i.test(t)) {
+    return { value: true };
+  }
+  return {};
+}
+
+function extractScreeningAreaWithSpan(t: string): { value?: ScreeningArea; span?: FieldSpan } {
+  const rules: { re: RegExp; area: ScreeningArea }[] = [
+    { re: /\bbreast\s+screening\b|\bscreening\s+(?:for\s+)?breast\b|स्तन\s+स्क्रीनिंग|ब्रेस्ट\s+स्क्रीनिंग/i, area: 'breast' },
+    { re: /\bcervical\s+screening\b|\bscreening\s+(?:for\s+)?cervical\b|सर्वाइकल\s+स्क्रीनिंग/i, area: 'cervical' },
+    { re: /\bncd\s+screening\b|\b(?:NCD|non[-\s]?communicable)\s+screening\b|एन\s*सी\s*डी\s+स्क्रीनिंग/i, area: 'ncd' },
+    { re: /\b(?:oral|mouth|munh)\s+screening\b|\bscreening\s+(?:for\s+)?oral\b|ओरल\s+स्क्रीनिंग|मुंह\s+स्क्रीनिंग/i, area: 'oral' },
+  ];
+  for (const { re, area } of rules) {
+    const m = t.match(re);
+    if (m && m.index !== undefined) {
+      return { value: area, span: { field: 'screeningArea', start: m.index, end: m.index + m[0].length } };
+    }
+  }
+  return {};
+}
+
+function extractScreeningFindingWithSpan(t: string): { value?: ScreeningFinding; span?: FieldSpan } {
+  const m = t.match(
+    /\b(?:key finding|finding|result)\s*(?:is|:)?\s*(positive|negative|needs review|needs further review|suspicious|suspicion)\b|(?:positive|negative|needs review)\s+finding\b|निष्कर्ष\s*(?:positive|negative|संदिग्ध)|(?:positive|negative|संदिग्ध)\s*(?:निष्कर्ष|finding)/i,
+  );
+  if (m && m.index !== undefined) {
+    const token = m[1] ?? m[0].match(/\b(positive|negative|needs review|needs further review|suspicious)\b/i)?.[0] ?? m[0];
+    let value: ScreeningFinding = 'needs_review';
+    if (/^positive$/i.test(token)) value = 'positive';
+    else if (/^negative$/i.test(token)) value = 'negative';
+    else if (/needs review|suspicious/i.test(token)) value = 'needs_review';
+    const off = m[0].toLowerCase().indexOf(token.toLowerCase());
+    const start = m.index + (off >= 0 ? off : 0);
+    const end = start + token.length;
+    return { value, span: { field: 'screeningFinding', start, end } };
+  }
+  return {};
+}
+
+function extractReferralRequiredWithSpan(t: string): { value?: ReferralRequiredAnswer; span?: FieldSpan } {
+  const no = t.match(
+    /\breferral\s+(?:is\s+)?not\s+required\b|\bno\s+referral\s+(?:needed|required)\b|\breferral\s+required\s*(?::\s*)?no\b|\breferral\s+nahi\b|\brefer\s+nahi\b/i,
+  );
+  if (no && no.index !== undefined) {
+    return { value: 'no', span: { field: 'referralRequired', start: no.index, end: no.index + no[0].length } };
+  }
+  const yes = t.match(
+    /\breferral\s+required\s*(?::\s*)?yes\b|\breferral\s+(?:is\s+)?required(?!\s*(?:no|nahi))\b|\brefer\s+karna\s+hai\b|\breferral\s+yes\b|\bneeds?\s+referral\b/i,
+  );
+  if (yes && yes.index !== undefined) {
+    return { value: 'yes', span: { field: 'referralRequired', start: yes.index, end: yes.index + yes[0].length } };
+  }
+  return {};
+}
+
+function extractFacilityAcceptedWithSpan(t: string): { accepted: boolean; span?: FieldSpan } {
+  const m = t.match(/\b(?:hospital|facility|they) (?:has |have )?(?:accepted|confirmed)\b|\baccept kar liya\b|स्वीकार कर/i);
+  if (m && m.index !== undefined) {
+    return { accepted: true, span: { field: 'facilityResponse', start: m.index, end: m.index + m[0].length } };
+  }
+  return { accepted: false };
+}
+
+function spansOverlap(a: FieldSpan, b: FieldSpan): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+export function resolveSpanOverlaps(spans: FieldSpan[]): FieldSpan[] {
+  const sorted = [...spans].sort((a, b) => {
+    const lenA = a.end - a.start;
+    const lenB = b.end - b.start;
+    if (lenB !== lenA) return lenB - lenA;
+    return SPAN_FIELD_PRIORITY[a.field] - SPAN_FIELD_PRIORITY[b.field];
+  });
+  const kept: FieldSpan[] = [];
+  for (const s of sorted) {
+    if (kept.some((k) => spansOverlap(k, s))) continue;
+    kept.push(s);
+  }
+  return kept.sort((a, b) => a.start - b.start);
+}
+
+export function parseFreeTextWithSpans(input: string, now: Date = new Date()): ParseResult {
+  const text = input.replace(/\s+/g, ' ').trim();
+  const day = todayISO(now);
+
+  const nameR = extractNameWithSpan(text);
+  const ageR = extractAgeWithSpan(text);
+  const phoneR = extractPhoneWithSpan(text);
+  const localityR = extractLocalityWithSpan(text);
+  const facilityR = extractFacilityWithSpan(text);
+  const referralR = extractReferralDateWithSpan(text, day);
+  const appointmentR = extractAppointmentWithSpan(text, day);
+  const urgencyR = extractUrgencyWithSpan(text);
+  const reasonR = extractReasonWithSpan(text);
+  const intentionR = extractIntentionWithSpan(text);
+  const facilityAcc = extractFacilityAcceptedWithSpan(text);
+  const screeningDoneR = extractScreeningCompletedWithSpan(text);
+  const screeningAreaR = extractScreeningAreaWithSpan(text);
+  const screeningFindingR = extractScreeningFindingWithSpan(text);
+  const referralReqR = extractReferralRequiredWithSpan(text);
+
+  const facilityNotHeard =
+    /\b(?:haven['’]?t heard|have not heard|not heard|no (?:reply|response|word|news|update)|nothing from|koi jawab nahi|jawab nahi aaya|koi khabar nahi)\b|कोई जवाब नहीं|जवाब नहीं आया|कोई खबर नहीं/i.test(
+      text,
+    );
+
+  const parsedCase: ParsedCase = {
+    name: nameR.value,
+    age: ageR.value,
+    sex: extractSex(text),
+    phone: phoneR.value,
+    locality: localityR.value,
+    destinationFacility: facilityR.value,
+    referralDate: referralR.value,
+    urgency: urgencyR.value,
+    reason: reasonR.value,
+    patientIntention: intentionR.value,
+    appointmentDate: appointmentR.value,
+    facilityNotHeard,
+    facilityAccepted: facilityAcc.accepted,
+    referralDecision: extractReferralDecision(text),
+    appointmentTentative: appointmentR.tentative,
+    screeningCompleted: screeningDoneR.value,
+    screeningArea: screeningAreaR.value,
+    screeningFinding: screeningFindingR.value,
+    referralRequired:
+      referralReqR.value ??
+      (extractReferralDecision(text) === 'referred' ? 'yes' : undefined),
+  };
+
+  const rawSpans: FieldSpan[] = [];
+  for (const s of [
+    screeningDoneR.span,
+    screeningAreaR.span,
+    screeningFindingR.span,
+    referralReqR.span,
+    nameR.span,
+    ageR.span,
+    phoneR.span,
+    localityR.span,
+    facilityR.span,
+    referralR.span,
+    appointmentR.span,
+    urgencyR.span,
+    reasonR.span,
+    intentionR.span,
+    facilityAcc.span,
+  ]) {
+    if (s) rawSpans.push(s);
+  }
+
+  return { case: parsedCase, spans: resolveSpanOverlaps(rawSpans), text };
 }
 
 export function parseFreeText(input: string, now: Date = new Date()): ParsedCase {
-  const t = input.replace(/\s+/g, ' ').trim();
-  const day = todayISO(now);
-  return {
-    name: extractName(t),
-    age: extractAge(t),
-    sex: extractSex(t),
-    phone: extractPhone(t),
-    locality: extractLocality(t),
-    destinationFacility: extractFacility(t),
-    referralDate: extractReferralDate(t, day),
-    urgency: extractUrgency(t),
-    reason: extractReason(t),
-    patientIntention: extractIntention(t),
-    appointmentDate: extractAppointment(t, day),
-    facilityNotHeard:
-      /\b(?:haven['’]?t heard|have not heard|not heard|no (?:reply|response|word|news|update)|nothing from|koi jawab nahi|jawab nahi aaya|koi khabar nahi)\b|कोई जवाब नहीं|जवाब नहीं आया|कोई खबर नहीं/i.test(
-        t,
-      ),
-    facilityAccepted: /\b(?:hospital|facility|they) (?:has |have )?(?:accepted|confirmed)\b|\baccept kar liya\b|स्वीकार कर/i.test(t),
-  };
+  return parseFreeTextWithSpans(input, now).case;
 }
 
 /** Which draft fields were understood (Known) vs not (Unknown). */
 export function fieldStates(p: ParsedCase): Record<ParsedField, 'known' | 'unknown'> {
   const k = (v: unknown) => (v !== undefined && v !== '' ? 'known' : 'unknown');
   return {
+    screeningCompleted: p.screeningCompleted ? 'known' : 'unknown',
+    screeningArea: k(p.screeningArea),
+    screeningFinding: k(p.screeningFinding),
+    referralRequired: k(p.referralRequired),
     name: k(p.name),
     age: k(p.age),
     phone: k(p.phone),
@@ -239,7 +615,9 @@ export function fieldStates(p: ParsedCase): Record<ParsedField, 'known' | 'unkno
 }
 
 export const EXAMPLES = {
-  en: 'I referred Mary to the district hospital yesterday for a follow-up screening test. She said she would go, but I haven\'t heard anything from the hospital yet.',
-  hinglish: 'Sunita ko kal CHC refer kiya, 42 saal, Rampur gaon, phone 98765 43210. Woh jayegi, par hospital se koi jawab nahi aaya.',
-  hindi: 'मैंने कमला को परसों जिला अस्पताल रेफर किया, जाँच के लिए। वह जाएगी, लेकिन अस्पताल से कोई जवाब नहीं आया।',
+  en: "Oral screening completed for Mrs Mary Sharma, 38 years, from House 12 Rampur village, phone 98765 43210. Key finding positive, referral required yes. I referred her to Sadar district hospital yesterday for urgent follow-up. She said she would go, but I haven't heard anything from the hospital yet.",
+  hinglish:
+    'Sunita Devi, 42 saal, mahila, Rampur gaon house 45, phone 9876543210. Breast screening completed — key finding needs review, referral required yes. Maine kal Bero CHC refer kiya, urgent TB check ke liye. Woh jayegi, par hospital se abhi koi jawab nahi aaya.',
+  hindi:
+    'सुनीता देवी, 42 saal, mahila, Rampur gaon makan 12, phone 9876543210. Cervical screening completed, key finding negative, referral required no. Woh jayegi, lekin hospital se abhi koi jawab nahi aaya.',
 };

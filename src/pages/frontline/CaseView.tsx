@@ -1,4 +1,6 @@
-import { Link, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { CaseStageSummary } from '../../components/CaseStageSummary';
 import { IntelligencePanel } from '../../components/IntelligencePanel';
 import { BackLink } from '../../components/Layout';
 import { Icon } from '../../components/Icon';
@@ -20,7 +22,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export function CaseView() {
   const { id = '' } = useParams();
+  const location = useLocation();
   const { t, formatDate } = useLang();
+  const [showStageSummary, setShowStageSummary] = useState(
+    !!(location.state as { showStageSummary?: boolean } | null)?.showStageSummary,
+  );
   const { data, loading } = useLive(async () => {
     const [c, syncEvents] = await Promise.all([getCase(id), listSyncEvents()]);
     return c ? { ...c, syncEvents } : null;
@@ -69,6 +75,16 @@ export function CaseView() {
         </dl>
       </section>
 
+      {showStageSummary && (
+        <CaseStageSummary
+          patient={patient}
+          referral={referral}
+          followUps={followUps}
+          dismissible
+          onDismiss={() => setShowStageSummary(false)}
+        />
+      )}
+
       <IntelligencePanel intel={intel} referralId={referral.id} />
 
       <section className="card">
@@ -83,6 +99,22 @@ export function CaseView() {
           <Row label={t('form.reason')}>{referral.reason || <Chip tone="danger">{t('factState.missing')}</Chip>}</Row>
           <Row label={t('form.referralDate')}>{formatDate(referral.referralDate)}</Row>
           <Row label={t('form.urgency')}>{t(`urgency.${referral.urgency}`)}</Row>
+          {referral.screening && (
+            <>
+              <Row label={t('parsed.screeningCompleted')}>
+                {referral.screening.completed ? t('screening.completed.yes') : t('screening.completed.no')}
+              </Row>
+              {referral.screening.area && (
+                <Row label={t('parsed.screeningArea')}>{t(`screening.area.${referral.screening.area}`)}</Row>
+              )}
+              {referral.screening.finding && (
+                <Row label={t('parsed.screeningFinding')}>{t(`screening.finding.${referral.screening.finding}`)}</Row>
+              )}
+              {referral.screening.referralRequired && (
+                <Row label={t('parsed.referralRequired')}>{t(`referralRequired.${referral.screening.referralRequired}`)}</Row>
+              )}
+            </>
+          )}
           <Row label={t('case.referredBy')}>{referral.referringWorker}</Row>
           {referral.notes && <Row label={t('case.notes')}>{referral.notes}</Row>}
         </dl>

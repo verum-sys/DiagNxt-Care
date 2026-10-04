@@ -96,3 +96,84 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   white-space: normal;
   text-align: left;
 }
+
+/* Highlighted describe textarea — mirror layer + transparent input */
+.highlight-ta-wrap {
+  border-radius: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--color-line);
+}
+.highlight-ta-wrap:focus-within {
+  outline: 3px solid #7cc4f5;
+  outline-offset: 1px;
+}
+.highlight-ta-wrap textarea.highlight-ta-input {
+  border: none;
+  outline: none;
+  resize: vertical;
+  min-height: 7rem;
+  background: transparent;
+  color: var(--color-ink);
+  caret-color: var(--color-ink);
+}
+/* Text is drawn on the mirror layer; input stays transparent only when highlights are on. */
+.highlight-ta-wrap.highlight-ta-active textarea.highlight-ta-input {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.highlight-ta-wrap.highlight-ta-active textarea.highlight-ta-input::selection {
+  background: rgb(124 196 245 / 0.45);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.highlight-ta-wrap:focus-within textarea.highlight-ta-input:focus {
+  outline: none;
+}
+.highlight-ta-mirror {
+  color: var(--color-ink);
+  z-index: 0;
+}
+.highlight-ta-mirror,
+.highlight-ta-wrap textarea.highlight-ta-input {
+  padding: 0.6rem 0.85rem;
+  line-height: 1.45;
+  font: inherit;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+mark.highlight-field {
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.1rem;
+  color: inherit;
+}
+mark.highlight-screeningCompleted { background: #ecfdf5; box-shadow: inset 0 0 0 1px #059669; }
+mark.highlight-screeningArea { background: #f0fdf4; box-shadow: inset 0 0 0 1px #16a34a; }
+mark.highlight-screeningFinding { background: #fff7ed; box-shadow: inset 0 0 0 1px #ea580c; }
+mark.highlight-referralRequired { background: #fef2f2; box-shadow: inset 0 0 0 1px #dc2626; }
+mark.highlight-name { background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+mark.highlight-age { background: var(--color-info-soft); box-shadow: inset 0 0 0 1px #7cc4f5; }
+mark.highlight-phone { background: #ede9fe; box-shadow: inset 0 0 0 1px #8b5cf6; }
+mark.highlight-locality { background: var(--color-ok-soft); box-shadow: inset 0 0 0 1px var(--color-ok); }
+mark.highlight-destinationFacility { background: #dbeafe; box-shadow: inset 0 0 0 1px #2563eb; }
+mark.highlight-referralDate { background: var(--color-warn-soft); box-shadow: inset 0 0 0 1px var(--color-warn); }
+mark.highlight-reason { background: #fce7f3; box-shadow: inset 0 0 0 1px #db2777; }
+mark.highlight-urgency { background: var(--color-danger-soft); box-shadow: inset 0 0 0 1px var(--color-danger); }
+mark.highlight-facilityResponse { background: var(--color-ok-soft); box-shadow: inset 0 0 0 1px var(--color-ok); }
+mark.highlight-appointmentDate { background: #fef9c3; box-shadow: inset 0 0 0 1px #ca8a04; }
+mark.highlight-patientIntention { background: #e0e7ff; box-shadow: inset 0 0 0 1px #4f46e5; }
+mark.highlight-field-active {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+}
+
+dialog.review-dialog {
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  max-width: min(32rem, calc(100vw - 2rem));
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.15);
+}
+dialog.review-dialog::backdrop {
+  background: rgb(11 59 92 / 0.35);
+}
