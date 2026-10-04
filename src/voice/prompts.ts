@@ -29,3 +29,8 @@ export const BUNDLED_PROMPT_KEYS: string[] = [
 export function clipUrl(lang: Lang, key: string): string {
   return `${import.meta.env.BASE_URL}audio/${lang}/${key.replace(/\./g, '_')}.m4a`;
 }
+
+export function dictationClipUrl(key: 'en' | 'hinglish' | 'hindi'): string {
+  return `${import.meta.env.BASE_URL}audio/dictation/${key}.m4a`;
+}
+

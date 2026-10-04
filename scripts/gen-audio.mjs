@@ -39,3 +39,28 @@ for (const [lang, dict] of [['en', en], ['hi', hi]]) {
   }
 }
 console.log(`Generated ${n} clips in public/audio/ (voices: ${VOICES.en}, ${VOICES.hi})`);
+
+// Bundled clinical dictation voice samples for offline Speak button
+const dictDir = join(root, 'public/audio/dictation');
+mkdirSync(dictDir, { recursive: true });
+const { EXAMPLES } = await import(join(root, 'src/intelligence/parser.ts'));
+const DICTATION_CONFIGS = {
+  en: { voice: VOICES.en, rate: '175', text: EXAMPLES.en.replace(/'/g, '') },
+  hinglish: { voice: VOICES.en, rate: '165', text: EXAMPLES.hinglish.replace(/[—–]/g, ',') },
+  hindi: {
+    voice: VOICES.hi,
+    rate: '160',
+    text: 'सुनीता देवी, 42 साल, महिला, रामपुर गांव मकान 12, फोन 9876543210। सर्वाइकल स्क्रीनिंग पूरी हुई, मुख्य निष्कर्ष नेगेटिव, रेफरल आवश्यक नहीं। वह जाएगी, लेकिन अस्पताल से अभी कोई जवाब नहीं आया।',
+  },
+};
+
+for (const [key, cfg] of Object.entries(DICTATION_CONFIGS)) {
+  const aiff = join(tmp, `dict_${key}.aiff`);
+  const out = join(dictDir, `${key}.m4a`);
+  execFileSync('say', ['-v', cfg.voice, '-r', cfg.rate, '-o', aiff, cfg.text]);
+  if (existsSync(out)) rmSync(out);
+  execFileSync('afconvert', ['-f', 'm4af', '-d', 'aac', '-b', '32000', aiff, out]);
+  rmSync(aiff);
+  console.log(`Generated dictation clip: public/audio/dictation/${key}.m4a`);
+}
+
