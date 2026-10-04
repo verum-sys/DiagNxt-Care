@@ -19,6 +19,7 @@ export const en = {
   'status.syncing': 'Syncing…',
   'status.savedLocally': 'Saved on this device',
   'status.offlineNote': 'You are offline. Everything still works and is saved on this device.',
+  'status.updateReady': 'Update ready — Tap to reload',
 
   'lang.toggle': 'हिंदी',
   'install.button': 'Install app',
@@ -384,6 +385,9 @@ export const en = {
   'sync.resetConfirm': 'Reset all demo data on this device?',
   'sync.worker': 'Worker name',
   'sync.language': 'Language',
+  'sync.updateTitle': 'App updates',
+  'sync.updateHint': 'Refresh app cache to fetch the latest updates from the server.',
+  'sync.reloadApp': 'Check for updates & reload',
   'sync.demoNote': 'Demo: the "server" is simulated on this device so the full flow works without a backend.',
 
   'facility.title': 'Referral inbox',

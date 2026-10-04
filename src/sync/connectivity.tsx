@@ -32,6 +32,8 @@ interface ConnectivityCtx {
   syncing: boolean;
   lastResult: SyncResult | null;
   sync: () => Promise<void>;
+  needRefresh: boolean;
+  reloadApp: () => Promise<void>;
 }
 
 const Ctx = createContext<ConnectivityCtx | null>(null);
@@ -47,7 +49,10 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
 
   // Service worker: app shell is cached for offline use after the first load.
-  useRegisterSW({
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
     onOfflineReady() {
       writeFlag(READY_KEY, true);
       setOfflineReady(true);
@@ -58,7 +63,25 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
         setOfflineReady(true);
       }
     },
+    onNeedRefresh() {
+      void updateServiceWorker(true);
+    },
   });
+
+  const reloadApp = useCallback(async () => {
+    try {
+      await updateServiceWorker(true);
+    } catch {
+      /* ignore */
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) {
+        await r.update();
+      }
+    }
+    window.location.reload();
+  }, [updateServiceWorker]);
 
   useEffect(() => {
     const up = () => setRealOnline(true);
@@ -95,7 +118,20 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
   }, [online, syncing]);
 
   return (
-    <Ctx.Provider value={{ online, simulateOffline, setSimulateOffline, offlineReady, pending, syncing, lastResult, sync }}>
+    <Ctx.Provider
+      value={{
+        online,
+        simulateOffline,
+        setSimulateOffline,
+        offlineReady,
+        pending,
+        syncing,
+        lastResult,
+        sync,
+        needRefresh,
+        reloadApp,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

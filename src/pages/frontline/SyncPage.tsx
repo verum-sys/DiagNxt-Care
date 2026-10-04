@@ -10,7 +10,7 @@ import { useConnectivity } from '../../sync/connectivity';
 export function SyncPage() {
   const { t, lang, setLang, formatDateTime } = useLang();
   const { workerName, setWorkerName } = useSettings();
-  const { online, simulateOffline, setSimulateOffline, offlineReady, pending, syncing, sync, lastResult } = useConnectivity();
+  const { online, simulateOffline, setSimulateOffline, offlineReady, pending, syncing, sync, lastResult, reloadApp } = useConnectivity();
   const { data: history } = useLive(listSyncEvents, []);
 
   return (
@@ -82,6 +82,19 @@ export function SyncPage() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="card space-y-2">
+        <h2 className="text-lg font-bold">{t('sync.updateTitle')}</h2>
+        <p className="text-[0.85rem] text-muted">{t('sync.updateHint')}</p>
+        <button
+          type="button"
+          className="btn btn-secondary btn-block !min-h-[44px]"
+          onClick={() => void reloadApp()}
+        >
+          <Icon name="sync" size={18} />
+          {t('sync.reloadApp')}
+        </button>
       </section>
 
       <section className="card">

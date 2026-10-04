@@ -5,7 +5,7 @@ import { Icon } from './Icon';
 /** Persistent connectivity / offline-readiness / sync indicator shown on every screen. */
 export function StatusBar({ showSync = true }: { showSync?: boolean }) {
   const { t } = useLang();
-  const { online, simulateOffline, offlineReady, pending, syncing, sync } = useConnectivity();
+  const { online, simulateOffline, offlineReady, pending, syncing, sync, needRefresh, reloadApp } = useConnectivity();
 
   return (
     <div
@@ -26,6 +26,18 @@ export function StatusBar({ showSync = true }: { showSync?: boolean }) {
           <Icon name={offlineReady ? 'check' : 'download'} size={14} />
           {offlineReady ? t('status.readyOffline') : t('status.preparingOffline')}
         </span>
+
+        {needRefresh && (
+          <button
+            type="button"
+            onClick={() => void reloadApp()}
+            className="chip cursor-pointer bg-brand text-white font-semibold shadow-sm hover:opacity-90"
+            title="A new version of CareLink is ready. Tap to reload."
+          >
+            <Icon name="spark" size={14} className="text-accent" />
+            {t('status.updateReady')}
+          </button>
+        )}
 
         <span className="ml-auto flex items-center gap-2">
           <span className={online ? 'text-muted' : 'text-slate-200'}>

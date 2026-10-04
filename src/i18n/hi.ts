@@ -23,6 +23,7 @@ export const hi: Partial<Record<MessageKey, string>> = {
   'status.syncing': 'सिंक हो रहा है…',
   'status.savedLocally': 'इस फ़ोन में सेव हुआ',
   'status.offlineNote': 'आप ऑफ़लाइन हैं। सब कुछ काम करता है और इसी फ़ोन में सेव होता है।',
+  'status.updateReady': 'नया अपडेट तैयार — रीलोड करें',
 
   'lang.toggle': 'English',
   'install.button': 'ऐप इंस्टॉल करें',
@@ -386,6 +387,9 @@ export const hi: Partial<Record<MessageKey, string>> = {
   'sync.resetConfirm': 'इस फ़ोन का सारा डेमो डेटा रीसेट करें?',
   'sync.worker': 'कार्यकर्ता का नाम',
   'sync.language': 'भाषा',
+  'sync.updateTitle': 'ऐप अपडेट',
+  'sync.updateHint': 'सर्वर से नवीनतम अपडेट प्राप्त करने के लिए ऐप कैश रीफ़्रेश करें।',
+  'sync.reloadApp': 'अपडेट जाँचें और रीलोड करें',
   'sync.demoNote': 'डेमो: "सर्वर" इसी फ़ोन पर सिम्युलेट है ताकि पूरा फ़्लो बिना बैकएंड के चले।',
 
   'facility.title': 'रेफ़रल इनबॉक्स',
