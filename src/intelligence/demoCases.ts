@@ -3,30 +3,43 @@
 export type DemoCaseId = 'case1' | 'case2' | 'case3';
 export type DemoLang = 'en' | 'hinglish' | 'hindi';
 
+/** New Case “Try an example”: one scenario per language (not three cases per language). */
+export const DEMO_CASE_BY_LANG: Record<DemoLang, DemoCaseId> = {
+  en: 'case1',
+  hinglish: 'case2',
+  hindi: 'case3',
+};
+
+export const DEMO_LANG_ORDER: DemoLang[] = ['en', 'hinglish', 'hindi'];
+
+export function demoTextForLang(lang: DemoLang): string {
+  return DEMO_CASE_TEXT[lang][DEMO_CASE_BY_LANG[lang]];
+}
+
 export const DEMO_CASE_TEXT: Record<DemoLang, Record<DemoCaseId, string>> = {
   en: {
     case1:
-      'I am registering Kamla today. She is 42 from Rampur village. I am referring her to the district hospital for a screening test. She is ready to go.',
+      'Initial Oral screening completed for Mrs Mary Sharma, 38 years, from House 12 Rampur village, phone 98765 43210. Key finding positive, referral required yes. I referred her to Sadar district hospital yesterday for urgent follow-up. She said she would go next week.',
     case2:
-      'I referred Sunita to the CHC yesterday for a follow-up check. She is 35, from Rampur village. The CHC has accepted the referral. They said she can come on Tuesday, but the appointment is not confirmed yet.',
+      'Sunita Devi is 42 years old, female, from house 45 Rampur village, phone 9876543210. NCD screening completed — key finding needs review, referral required yes. I referred her to Bero CHC yesterday for an urgent NCD follow-up. She will go, but we have not heard back from the hospital yet.',
     case3:
-      'We referred Reena two weeks ago for a screening test. She was supposed to go to the district hospital on Monday. The hospital had accepted the referral, but we still do not know whether she reached the hospital or not.',
+      'Reena was supposed to go to the district hospital on Monday. The hospital had accepted the referral, but we still do not know whether she reached the hospital or not.',
   },
   hinglish: {
     case1:
-      'Aaj main Kamla ko register kar rahi hoon. Woh 42 saal ki hain, Rampur gaon se. Maine screening test ke liye district hospital mein refer kiya. Woh jaane ko taiyar hain.',
+      'Mary Sharma, 38 saal — oral screening complete ho gayi, House 12 Rampur gaon, phone 9876543210. Key finding positive, referral required yes. Maine kal Sadar district hospital mein urgent follow-up ke liye refer kiya. Woh agle hafte jayegi.',
     case2:
-      'Sunita ko kal CHC refer kiya tha, 35 saal, Rampur gaon. CHC ne referral accept kar liya hai. Unhone bola hai ki woh Tuesday ko aa sakti hai, lekin appointment abhi confirm nahi hua.',
+      'Sunita Devi, 42 saal, mahila, Rampur gaon house 45, phone 9876543210. NCD screening completed — key finding needs review, referral required yes. Maine kal Bero CHC refer kiya, urgent NCD follow-up ke liye. Woh jayegi, par hospital se abhi koi jawab nahi aaya.',
     case3:
-      'Reena ko do hafte pehle screening test ke liye refer kiya tha. Somvar ko district hospital jana tha. Hospital ne referral accept kar liya tha, lekin abhi tak pata nahi ki woh hospital pahunchi ya nahi.',
+      'Reena ko somvar ko jila aspatal mein jana tha. Aspatal ne referral accept kar liya tha, lekin abhi tak yeh jaankari nahi mili ki woh aspatal pahunchi ya nahi.',
   },
   hindi: {
     case1:
-      'आज मैं कमला का पंजीकरण कर रही हूँ। वह 42 वर्ष की हैं, रामपुर गाँव से। मैं उन्हें जाँच के लिए जिला अस्पताल रेफर कर रही हूँ। वह जाने को तैयार हैं।',
+      'श्रीमती मैरी शर्मा, 38 वर्ष, मकान 12 रामपुर गाँव, फ़ोन 9876543210। प्रारंभिक मुंह की जाँच पूरी, key finding positive, referral required yes। मैंने कल Sadar district hospital में tatkal follow-up के लिए रेफर किया। वह अगले हफ़्ते जाएगी।',
     case2:
-      'मैंने कल सुनीता, 35 वर्ष, रामपुर गाँव, को सीएचसी रेफर किया। सीएचसी ने रेफरल स्वीकार कर लिया है। उन्होंने कहा कि वह मंगलवार को आ सकती है, लेकिन अपॉइंटमेंट अभी पुष्टि नहीं हुई।',
+      'सुनीता देवी, 42 वर्ष, महिला, रामपुर गाँव मकान 45, फ़ोन 9876543210। NCD screening completed — key finding needs review, referral required yes। मैंने कल Bero CHC में tatkal NCD follow-up के लिए रेफर किया। वह जाएगी, लेकिन अस्पताल से अभी कोई जवाब नहीं आया।',
     case3:
-      'रीना को दो हफ़्ते पहले जाँच के लिए रेफर किया था। सोमवार को जिला अस्पताल में जाना था। अस्पताल ने रेफरल स्वीकार किया था, लेकिन अभी तक यह जानकारी नहीं मिली कि वह अस्पताल पहुँची या नहीं।',
+      'रीना को जिला अस्पताल में सोमवार को जाना था। अस्पताल ने रेफरल स्वीकार किया था, लेकिन अभी तक यह जानकारी नहीं मिली कि वह अस्पताल पहुंची या नहीं।',
   },
 };
 

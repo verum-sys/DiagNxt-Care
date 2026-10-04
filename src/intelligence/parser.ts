@@ -174,7 +174,9 @@ function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
     { re: /\bregistering\s+([A-Z][a-z]+)\b/, group: 1 },
     { re: new RegExp(`([${DEV}]+)(?=\\s+का\\s+पंजीकरण)`), group: 1 },
     { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*\d/, group: 1 },
+    { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is\s+\d/, group: 1 },
     { re: new RegExp(`^([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
+    { re: new RegExp(`श्रीमती\\s+([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
     { re: /\b(?:name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b[Rr]eferred\s+(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b(?:Mrs\.?|Smt\.?|Mr\.?|Shri)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
@@ -366,7 +368,24 @@ function extractWeekdayAppointmentWithSpan(
   return {};
 }
 
+function extractRelativeAppointmentWithSpan(
+  t: string,
+  now: string,
+): { value?: string; span?: FieldSpan; tentative?: boolean } {
+  const m = t.match(/\bnext week\b|\bagle hafte\b|अगले\s+हफ़?्ते/i);
+  if (m && m.index !== undefined) {
+    return {
+      value: addDays(now, 7),
+      span: { field: 'appointmentDate', start: m.index, end: m.index + m[0].length },
+    };
+  }
+  return {};
+}
+
 function extractAppointmentWithSpan(t: string, now: string): { value?: string; span?: FieldSpan; tentative?: boolean } {
+  const relative = extractRelativeAppointmentWithSpan(t, now);
+  if (relative.value) return relative;
+
   const weekday = extractWeekdayAppointmentWithSpan(t, now);
   if (weekday.value) return weekday;
 
@@ -449,12 +468,12 @@ function extractReasonWithSpan(t: string): { value?: string; span?: FieldSpan } 
     const hit = reasonFromForClause(en);
     if (hit?.value) return hit;
   }
-  const hingRe = /\b([a-z]+(?:\s+[a-z]+){0,2})\s+ke\s+liye\b/gi;
+  const hingRe = /\b([a-z]+(?:[-\s][a-z]+){0,3})\s+ke\s+liye\b/gi;
   let hing: RegExpExecArray | null;
   let best: { value: string; span: FieldSpan } | undefined;
   while ((hing = hingRe.exec(t)) !== null) {
     let phrase = hing[1].trim();
-    phrase = phrase.replace(/^(?:maine|unhe|unko|unhein|unki)\s+/i, '').trim();
+    phrase = phrase.replace(/^(?:maine|mein|unhe|unko|unhein|unki)\s+/i, '').trim();
     if (!phrase) continue;
     if (/\brefer\b/i.test(phrase)) continue;
     if (/^(?:maine|chc|phc)\b/i.test(phrase)) continue;
@@ -506,19 +525,19 @@ function screeningDoneWordSpan(m: RegExpMatchArray): FieldSpan | undefined {
 }
 
 function extractScreeningCompletedWithSpan(t: string): { value?: boolean; span?: FieldSpan } {
-  const areaFirst = t.match(/\b(?:oral|breast|cervical|ncd)\s+screening\s+(completed|done|complete)\b/i);
+  const areaFirst = t.match(/\b(?:oral|breast|cervical|ncd|TB)\s+screening\s+(completed|done|complete)\b/i);
   if (areaFirst) {
     const span = screeningDoneWordSpan(areaFirst);
     if (span) return { value: true, span };
   }
   const m = t.match(
-    /\b(?:screening|janch|jaanch|checkup)\s+(completed|done|complete|poori|puri|ho gayi|ho gaya)\b|\b(?:completed|done)\s+(?:oral|breast|cervical|ncd|the)\s+screening\b|स्क्रीनिंग\s+(?:पूरी|पूरा|हो गई)|जाँच\s+पूरी/i,
+    /\b(?:screening|janch|jaanch|checkup)\s+(?:completed|done|complete|poori|puri|ho gayi|ho gaya)\b|\bTB\s+screening\s+completed\b|\boral screening complete ho gayi\b|\b(?:completed|done)\s+(?:oral|breast|cervical|ncd|the)\s+screening\b|स्क्रीनिंग\s+(?:पूरी|पूरा|हो गई)|टी\s*बी\s+स्क्रीनिंग\s+पूरी|जाँच\s+पूरी|मुंह\s+की\s+जाँच\s+पूरी/i,
   );
   if (m && m.index !== undefined) {
     const span = screeningDoneWordSpan(m);
     if (span) return { value: true, span };
   }
-  if (/\b(?:oral|breast|cervical|ncd)\s+screening\b/i.test(t) && /\b(?:key finding|finding|result)\b/i.test(t)) {
+  if (/\b(?:oral|breast|cervical|ncd|TB)\s+screening\b/i.test(t) && /\b(?:key finding|finding|result)\b/i.test(t)) {
     return { value: true };
   }
   return {};
@@ -529,7 +548,10 @@ function extractScreeningAreaWithSpan(t: string): { value?: ScreeningArea; span?
     { re: /\bbreast\s+screening\b|\bscreening\s+(?:for\s+)?breast\b|स्तन\s+स्क्रीनिंग|ब्रेस्ट\s+स्क्रीनिंग/i, area: 'breast' },
     { re: /\bcervical\s+screening\b|\bscreening\s+(?:for\s+)?cervical\b|सर्वाइकल\s+स्क्रीनिंग/i, area: 'cervical' },
     { re: /\bncd\s+screening\b|\b(?:NCD|non[-\s]?communicable)\s+screening\b|एन\s*सी\s*डी\s+स्क्रीनिंग/i, area: 'ncd' },
-    { re: /\b(?:oral|mouth|munh)\s+screening\b|\bscreening\s+(?:for\s+)?oral\b|ओरल\s+स्क्रीनिंग|मुंह\s+स्क्रीनिंग/i, area: 'oral' },
+    {
+      re: /\b(?:oral|mouth|munh)\s+screening\b|\bscreening\s+(?:for\s+)?oral\b|ओरल\s+स्क्रीनिंग|मुंह\s+(?:की\s+)?(?:जाँच|स्क्रीनिंग)|प्रारंभिक\s+मुंह/i,
+      area: 'oral',
+    },
   ];
   for (const { re, area } of rules) {
     const m = t.match(re);
@@ -628,6 +650,22 @@ export function parseFreeTextWithSpans(input: string, now: Date = new Date()): P
       text,
     );
 
+  /** Past visit + accepted referral but no referral date → treat referral as on or before the visit. */
+  let referralDate = referralR.value;
+  if (!referralDate && appointmentR.value && facilityAcc.accepted && appointmentR.value < day) {
+    referralDate = appointmentR.value;
+  }
+
+  let reason = reasonR.value;
+  if (
+    !reason &&
+    appointmentR.value &&
+    facilityR.value &&
+    /\b(?:was\s+supposed|had\s+to\s+go)\b|\bjana\s+tha\b|जाना\s+था/i.test(text)
+  ) {
+    reason = `Scheduled visit — ${facilityR.value}`;
+  }
+
   const parsedCase: ParsedCase = {
     name: nameR.value,
     age: ageR.value,
@@ -635,9 +673,9 @@ export function parseFreeTextWithSpans(input: string, now: Date = new Date()): P
     phone: phoneR.value,
     locality: localityR.value,
     destinationFacility: facilityR.value,
-    referralDate: referralR.value,
+    referralDate,
     urgency: urgencyR.value,
-    reason: reasonR.value,
+    reason,
     patientIntention: intentionR.value,
     appointmentDate: appointmentR.value,
     facilityNotHeard,

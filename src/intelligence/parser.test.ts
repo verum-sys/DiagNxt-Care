@@ -90,7 +90,7 @@ describe('parseFreeTextWithSpans', () => {
   it('case1 English — highlights key phrases', () => {
     const { text, spans } = parseFreeTextWithSpans(DEMO_CASE_TEXT.en.case1, NOW);
     const byField = Object.fromEntries(spans.map((s) => [s.field, s]));
-    expect(sliceSpan(text, byField.name)).toBe('Kamla');
+    expect(sliceSpan(text, byField.name)).toBe('Mary Sharma');
     expect(sliceSpan(text, byField.destinationFacility).toLowerCase()).toContain('district hospital');
     expect(byField.patientIntention).toBeDefined();
     expect(byField.age).toBeDefined();

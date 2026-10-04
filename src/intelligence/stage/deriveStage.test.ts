@@ -22,10 +22,10 @@ describe('deriveCaseStageFromDraft', () => {
     expect(deriveCaseStageFromDraft({ text: 'Patient has fever', parsed })).toBe('initial_assessment');
   });
 
-  it('demo case2 en → appointment_scheduled', () => {
+  it('demo case2 en → referral_initiated', () => {
     const text = DEMO_CASE_TEXT.en.case2;
     const parsed = parseFreeText(text, NOW);
-    expect(deriveCaseStageFromDraft({ text, parsed, now: DAY })).toBe('appointment_scheduled');
+    expect(deriveCaseStageFromDraft({ text, parsed, now: DAY })).toBe('referral_initiated');
   });
 
   it('demo case3 en → follow_up_due', () => {

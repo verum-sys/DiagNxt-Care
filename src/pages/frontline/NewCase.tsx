@@ -23,8 +23,10 @@ import { today } from '../../intelligence/dates';
 import { analyze } from '../../intelligence/engine';
 import {
   allDemoCaseTexts,
+  DEMO_CASE_BY_LANG,
   DEMO_CASE_TEXT,
-  type DemoCaseId,
+  DEMO_LANG_ORDER,
+  demoTextForLang,
   type DemoLang,
 } from '../../intelligence/demoCases';
 import { parseFreeTextWithSpans, type FieldSpan, type ParsedCase, type ParsedField } from '../../intelligence/parser';
@@ -138,7 +140,6 @@ export function NewCase() {
   const [reviewed, setReviewed] = useState(false);
   const [needsReunderstand, setNeedsReunderstand] = useState(false);
   const [notesLinked, setNotesLinked] = useState(true);
-  const [exampleLang, setExampleLang] = useState<DemoLang>('en');
   const [highlightField, setHighlightField] = useState<ParsedField | null>(null);
   const [reviewDialogChecked, setReviewDialogChecked] = useState(false);
   const [appointmentTentative, setAppointmentTentative] = useState(false);
@@ -233,10 +234,10 @@ export function NewCase() {
       patientIntention: p.patientIntention ?? f.patientIntention,
       notes: result.text,
       facilityResponse: p.facilityAccepted ? 'accepted' : undefined,
-      screeningCompleted: p.screeningCompleted ?? f.screeningCompleted,
-      screeningArea: p.screeningArea ?? f.screeningArea,
-      screeningFinding: p.screeningFinding ?? f.screeningFinding,
-      referralRequired: p.referralRequired ?? f.referralRequired,
+      screeningCompleted: p.screeningCompleted ?? false,
+      screeningArea: p.screeningArea ?? '',
+      screeningFinding: p.screeningFinding ?? '',
+      referralRequired: p.referralRequired ?? '',
     }));
   }
 
@@ -277,12 +278,15 @@ export function NewCase() {
   }, [parsed, describeInSync, text, form]);
   const activeSpans = describeInSync ? spans : [];
   const isExampleText = allDemoCaseTexts().includes(text);
-  const demoCaseIds: DemoCaseId[] = ['case1', 'case2', 'case3'];
 
-  function loadDemoCase(caseId: DemoCaseId) {
-    const sample = DEMO_CASE_TEXT[exampleLang][caseId];
+  function loadDemoForLang(demoLang: DemoLang) {
+    const sample = demoTextForLang(demoLang);
     setText(sample);
     understand(sample);
+  }
+
+  function isDemoLangSelected(demoLang: DemoLang): boolean {
+    return text === DEMO_CASE_TEXT[demoLang][DEMO_CASE_BY_LANG[demoLang]];
   }
   const canSaveNew =
     !editing && parsed !== null && reviewed && describeInSync && !needsReunderstand;
@@ -385,32 +389,21 @@ export function NewCase() {
           <div>
             <div className="mb-1 text-[0.85rem] font-semibold text-muted">{t('new.examples')}</div>
             <p className="mb-2 text-[0.85rem] text-muted">{t('new.examplesHint')}</p>
-            <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label={t('new.examples')}>
-              {(['en', 'hinglish', 'hindi'] as const).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  role="tab"
-                  aria-selected={exampleLang === k}
-                  className={`btn !min-h-[44px] text-[0.9rem] ${exampleLang === k ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setExampleLang(k)}
-                >
-                  {t(`new.example.${k}`)}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {demoCaseIds.map((caseId) => (
-                <button
-                  key={caseId}
-                  type="button"
-                  className="btn btn-secondary btn-block !min-h-[52px] !flex-col items-start !py-2 text-left"
-                  onClick={() => loadDemoCase(caseId)}
-                >
-                  <span className="font-bold">{t(`new.demo.${caseId}.title`)}</span>
-                  <span className="text-[0.85rem] font-normal text-muted">{t(`new.demo.${caseId}.blurb`)}</span>
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2" aria-label={t('new.examples')}>
+              {DEMO_LANG_ORDER.map((demoLang) => {
+                const selected = isDemoLangSelected(demoLang);
+                return (
+                  <button
+                    key={demoLang}
+                    type="button"
+                    aria-pressed={selected}
+                    className={`btn !min-h-[44px] text-[0.9rem] ${selected ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => loadDemoForLang(demoLang)}
+                  >
+                    {t(`new.example.${demoLang}`)}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="grid grid-cols-1 gap-2 xs:grid-cols-2 sm:grid-cols-2">
