@@ -62,17 +62,7 @@ export function IntelligencePanel({ intel, referralId }: { intel: Intelligence; 
         : `/case/${referralId}/follow-up?suggested=${intel.action}`;
 
   return (
-    <section className="overflow-hidden rounded-2xl border-2 border-accent/40 bg-white" aria-labelledby="intel-title">
-      <header className="bg-accent-soft px-4 py-3">
-        <h3 id="intel-title" className="flex items-center gap-2 text-lg font-bold text-brand">
-          <Icon name="spark" size={20} className="text-accent" />
-          {t('intel.title')}
-        </h3>
-        <p className="text-[0.82rem] text-brand/80">
-          {t('intel.badge')} · {t('intel.assists')}
-        </p>
-      </header>
-
+    <section className="overflow-hidden rounded-2xl border-2 border-accent/40 bg-white" aria-label="Intelligence">
       <div className="space-y-4 p-4">
         <div>
           <div className="mb-1 text-[0.85rem] font-semibold uppercase tracking-wide text-muted">{t('intel.careState')}</div>
@@ -87,7 +77,6 @@ export function IntelligencePanel({ intel, referralId }: { intel: Intelligence; 
               <span className="font-semibold">{t('intel.why')}: </span>
               {reasonText}
             </p>
-            <p className="mt-1 text-[0.9rem] italic text-muted">{t('reason.youDecide')}</p>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
               <Link to={takeHref} className="btn btn-primary btn-block text-center" role="button">
                 {t('intel.take')}
@@ -99,7 +88,6 @@ export function IntelligencePanel({ intel, referralId }: { intel: Intelligence; 
                   { key: 'intel.suggested' },
                   { key: `action.${intel.action}` },
                   { text: reasonText },
-                  { key: 'reason.youDecide' },
                 ]}
               />
             </div>

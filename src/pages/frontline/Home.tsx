@@ -70,13 +70,9 @@ export function Home() {
       ) : (
         <>
           <section aria-labelledby="attn">
-            <h2 id="attn" className="text-lg font-bold">
+            <h2 id="attn" className="mb-2 text-lg font-bold">
               {t('home.needsAttention')} <span className="text-muted">({ranked.needsAttention.length})</span>
             </h2>
-            <p className="mb-2 flex items-center gap-1 text-[0.85rem] text-muted">
-              <Icon name="spark" size={14} className="text-accent" />
-              {t('home.needsAttentionHint')}
-            </p>
             <div className="space-y-3">
               {ranked.needsAttention.map((c) => (
                 <CaseCard key={c.referral.id} c={c} highlight />
