@@ -84,6 +84,33 @@ describe('parseFreeText', () => {
     expect(p.appointmentDate).toBe('2026-10-07');
     expect(p.appointmentTentative).toBe(true);
   });
+
+  it('Case 1 — Kamla / Laxmi Oraon English scenario', () => {
+    const t = 'I am registering Laxmi Oraon today. She is 42 from Rampur village. I am referring her to the district hospital for a screening test. She is ready to go.';
+    const p = parseFreeText(t, NOW);
+    expect(p.name).toBe('Laxmi Oraon');
+    expect(p.age).toBe(42);
+    expect(p.locality).toBe('Rampur');
+    expect(p.destinationFacility).toBe('District Hospital');
+    expect(p.referralDate).toBe('2026-10-04');
+    expect(p.reason).toBe('screening test');
+    expect(p.patientIntention).toBe('will_attend');
+    expect(p.facilityAccepted).toBe(false);
+    expect(p.appointmentDate).toBeUndefined();
+  });
+
+  it('Case 2 — Sunita Hinglish scenario', () => {
+    const t = 'Sunita ko kal CHC refer kiya tha, 35 saal, Rampur gaon. CHC ne referral accept kar liya hai. Unhone bola hai ki woh Tuesday ko aa sakti hai, lekin appointment abhi confirm nahi hua.';
+    const p = parseFreeText(t, NOW);
+    expect(p.name).toBe('Sunita');
+    expect(p.age).toBe(35);
+    expect(p.locality).toBe('Rampur');
+    expect(p.destinationFacility).toBe('Community Health Centre (CHC)');
+    expect(p.referralDate).toBe('2026-10-03');
+    expect(p.facilityAccepted).toBe(true);
+    expect(p.appointmentDate).toBe('2026-10-06');
+    expect(p.appointmentTentative).toBe(true);
+  });
 });
 
 describe('parseFreeTextWithSpans', () => {

@@ -171,7 +171,7 @@ function spanFromMatch(m: RegExpMatchArray, field: ParsedField, group = 0): Fiel
 
 function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
   const patterns: { re: RegExp; group: number }[] = [
-    { re: /\bregistering\s+([A-Z][a-z]+)\b/, group: 1 },
+    { re: /\bregistering\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/, group: 1 },
     { re: new RegExp(`([${DEV}]+)(?=\\s+का\\s+पंजीकरण)`), group: 1 },
     { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*\d/, group: 1 },
     { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is\s+\d/, group: 1 },

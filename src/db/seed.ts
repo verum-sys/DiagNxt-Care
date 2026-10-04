@@ -2,12 +2,12 @@
  * Synthetic demo data (no real patients). Dates are relative to today so the demo always
  * shows the intended states. Cases that "already synced" are also written to the simulated server.
  */
-import { addDays, today } from '../intelligence/dates';
+import { addDays, nearestWeekdayIso, today } from '../intelligence/dates';
 import { getDB, getMeta, notifyChange } from './db';
 import { emptyFacility, makePatient, makeReferral } from './factory';
 import type { FacilityEvent, FollowUp, Patient, Referral } from './types';
 
-const SEED_VERSION = 2;
+const SEED_VERSION = 4;
 export const DEFAULT_WORKER = 'ASHA Rekha Devi';
 
 function iso(day: string, hour = 10): string {
@@ -19,8 +19,8 @@ function build() {
   const t = today();
   const patients: Patient[] = [
     makePatient({ id: 'CL-0001', name: 'Mary Kujur', age: 45, sex: 'F', phone: '9431201145', locality: 'Bero village', syncStatus: 'pending' }),
-    makePatient({ id: 'CL-0002', name: 'Sunita Devi', age: 38, sex: 'F', phone: '9835012277', locality: 'Rampur', syncStatus: 'synced' }),
-    makePatient({ id: 'CL-0003', name: 'Lakshmi Oraon', age: 52, sex: 'F', phone: '7004318862', locality: 'Chanho', syncStatus: 'synced' }),
+    makePatient({ id: 'CL-0002', name: 'Sunita Devi', age: 35, sex: 'F', phone: '9835012277', locality: 'Rampur gaon', syncStatus: 'synced' }),
+    makePatient({ id: 'CL-0003', name: 'Lakshmi Oraon', age: 42, sex: 'F', phone: '7004318862', locality: 'Rampur village', syncStatus: 'synced' }),
     makePatient({ id: 'CL-0004', name: 'Ramesh Mahto', age: 61, sex: 'M', phone: '9798440021', locality: 'Mandar', syncStatus: 'synced' }),
     makePatient({ id: 'CL-0005', name: 'Geeta Kumari', age: 29, sex: 'F', locality: 'Itki', syncStatus: 'pending' }),
   ];
@@ -40,31 +40,33 @@ function build() {
       notes: 'She said she would go. No word from the hospital yet.',
       syncStatus: 'pending',
     }),
-    // 2. Accepted by facility with appointment scheduled in 4 days.
+    // 2. Case 2: Referral accepted + appointment tentative (Sunita in accepted).
     makeReferral({
       id: 'REF-0002',
       patientId: 'CL-0002',
       reason: 'Follow-up of abnormal screening result',
       destinationFacility: 'CHC Bero',
-      referralDate: addDays(t, -4),
+      referralDate: addDays(t, -1),
       urgency: 'routine',
-      notes: '',
+      patientIntention: 'will_attend',
+      notes: 'Sunita ko kal CHC refer kiya tha, 35 saal, Rampur gaon. CHC ne referral accept kar liya hai. Unhone bola hai ki woh Tuesday ko aa sakti hai, lekin appointment abhi confirm nahi hua.',
       syncStatus: 'synced',
-      lastSyncedAt: synced(addDays(t, -4)),
-      facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, 4), updatedAt: iso(addDays(t, -1), 11) },
+      lastSyncedAt: synced(addDays(t, -1)),
+      facility: { ...emptyFacility(), response: 'accepted', updatedAt: iso(addDays(t, -1), 11) },
     }),
-    // 3. Appointment scheduled in 3 days; patient intention not confirmed.
+    // 3. Case 1: New patient + referral initiated (Lakshmi Oraon on pending).
     makeReferral({
       id: 'REF-0003',
       patientId: 'CL-0003',
-      reason: 'Specialist review',
-      destinationFacility: 'RIMS Medical College Hospital',
-      referralDate: addDays(t, -6),
+      reason: 'Screening test',
+      destinationFacility: 'District Hospital',
+      referralDate: t,
       urgency: 'routine',
-      notes: 'Needs someone to travel with her.',
+      patientIntention: 'will_attend',
+      notes: 'I am registering Lakshmi Oraon today. She is 42 from Rampur village. I am referring her to the district hospital for a screening test. She is ready to go.',
       syncStatus: 'synced',
-      lastSyncedAt: synced(addDays(t, -6)),
-      facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, 3), updatedAt: iso(addDays(t, -3), 12) },
+      lastSyncedAt: synced(t),
+      facility: { ...emptyFacility(), response: 'received', updatedAt: iso(t, 10) },
     }),
     // 4. Appointment 4 days ago, patient confirmed did not attend, urgent.
     makeReferral({
@@ -94,23 +96,26 @@ function build() {
   ];
 
   const followUps: FollowUp[] = [
-    { id: 'fu-seed-1', referralId: 'REF-0003', at: iso(addDays(t, -3), 16), action: 'contacted_patient', note: 'Told her the appointment date. She is not sure she can travel.', data: { intention: 'unsure' }, suggestedAction: 'remind_patient', syncStatus: 'synced' },
     { id: 'fu-seed-2', referralId: 'REF-0004', at: iso(addDays(t, -9), 15), action: 'appointment_confirmed', note: 'Ramesh confirmed he will go with his son.', data: { date: addDays(t, -4) }, suggestedAction: 'remind_patient', syncStatus: 'synced' },
     { id: 'fu-seed-3', referralId: 'REF-0004', at: iso(addDays(t, -1), 17), action: 'unable_to_reach', note: 'Phone switched off.', suggestedAction: 'reschedule', syncStatus: 'synced' },
   ];
   // Reflect seeded follow-ups in the worker facts / intention.
-  referrals[2].patientIntention = 'unsure';
+  referrals[1].worker = {
+    facilityResponse: 'accepted',
+    appointmentDate: nearestWeekdayIso(2, t, 'future'),
+    appointmentCertainty: 'tentative',
+  };
+  referrals[2].patientIntention = 'will_attend';
   referrals[3].worker = { appointmentDate: addDays(t, -4), facilityResponse: 'accepted', attendance: 'not_attended' };
 
   const facilityEvents: FacilityEvent[] = [
-    { id: 'fe-seed-1', referralId: 'REF-0002', at: iso(addDays(t, -3), 10), kind: 'acknowledged' },
-    { id: 'fe-seed-2', referralId: 'REF-0002', at: iso(addDays(t, -2), 11), kind: 'accepted', text: 'Specialist consultation approved.' },
-    { id: 'fe-seed-2b', referralId: 'REF-0002', at: iso(addDays(t, -1), 11), kind: 'scheduled', text: addDays(t, 4) },
-    { id: 'fe-seed-3', referralId: 'REF-0003', at: iso(addDays(t, -3), 12), kind: 'scheduled', text: addDays(t, 3) },
+    { id: 'fe-seed-1', referralId: 'REF-0002', at: iso(addDays(t, -2), 10), kind: 'acknowledged' },
+    { id: 'fe-seed-2', referralId: 'REF-0002', at: iso(addDays(t, -1), 11), kind: 'accepted', text: 'CHC ne referral accept kar liya hai. Unhone bola hai ki woh Tuesday ko aa sakti hai, lekin appointment abhi confirm nahi hua.' },
+    { id: 'fe-seed-3', referralId: 'REF-0003', at: iso(t, 10), kind: 'acknowledged', text: 'Referral acknowledged and pending facility review.' },
     { id: 'fe-seed-4', referralId: 'REF-0004', at: iso(addDays(t, -9), 9), kind: 'scheduled', text: addDays(t, -4) },
     { id: 'fe-seed-4b', referralId: 'REF-0004', at: iso(addDays(t, -3), 10), kind: 'not_attended', text: 'Patient did not attend scheduled appointment.' },
   ];
-  referrals[1].facility.notes = [{ at: iso(addDays(t, -1), 11), text: 'Appointment slot allocated for follow-up.' }];
+  referrals[1].facility.notes = [{ at: iso(addDays(t, -1), 11), text: 'Referral accepted. Unhone bola hai ki woh Tuesday ko aa sakti hai, lekin appointment abhi confirm nahi hua.' }];
 
   return { patients, referrals, followUps, facilityEvents };
 }

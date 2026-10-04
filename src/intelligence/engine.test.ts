@@ -4,6 +4,7 @@ import type { FollowUp } from '../db/types';
 import { analyze, isOverride } from './engine';
 import { addDays } from './dates';
 import { rankCases } from './priority';
+import { inboxTab } from '../pages/facility/Inbox';
 
 const NOW = new Date(2026, 9, 4, 10, 0, 0); // 2026-10-04 local
 const TODAY = '2026-10-04';
@@ -186,3 +187,60 @@ describe('overrides', () => {
     expect(isOverride(fu('facility_contacted', 'x', { suggestedAction: 'confirm_referral' }))).toBe(false);
   });
 });
+
+describe('Case 1 & Case 2 specifications', () => {
+  it('Case 1 — Lakshmi Oraon: referral initiated, pending in facility inbox, attendance na', () => {
+    const laxmi = makePatient({ id: 'CL-0003', name: 'Lakshmi Oraon', age: 42, sex: 'F', locality: 'Rampur village' });
+    const ref = makeReferral({
+      id: 'REF-0003',
+      patientId: 'CL-0003',
+      reason: 'Screening test',
+      destinationFacility: 'District Hospital',
+      referralDate: TODAY,
+      urgency: 'routine',
+      patientIntention: 'will_attend',
+      syncStatus: 'synced',
+      lastSyncedAt: '2026-10-04T10:00:00.000Z',
+      facility: { ...emptyFacility(), response: 'received' },
+    });
+    expect(inboxTab(ref)).toBe('pending');
+    const i = analyze(laxmi, ref, [], NOW);
+    expect(i.careState).toBe('awaiting_facility');
+    const fact = (k: string) => i.facts.find((f) => f.key === k)!;
+    expect(fact('fact.patient').value).toBe('Lakshmi Oraon');
+    expect(fact('fact.locality').value).toBe('Rampur village');
+    expect(fact('fact.destination').value).toBe('District Hospital');
+    expect(fact('fact.referralDate').value).toBe(TODAY);
+    expect(fact('fact.reason').value).toBe('Screening test');
+    expect(fact('fact.intention').valueKey).toBe('intention.will_attend');
+    expect(fact('fact.appointment').state).toBe('unknown');
+    expect(fact('fact.attendance').state).toBe('na');
+  });
+
+  it('Case 2 — Sunita Devi: accepted, tentative appointment, attendance na, action confirm_appointment', () => {
+    const sunita = makePatient({ id: 'CL-0002', name: 'Sunita Devi', age: 35, sex: 'F', locality: 'Rampur gaon' });
+    const ref = makeReferral({
+      id: 'REF-0002',
+      patientId: 'CL-0002',
+      reason: 'Follow-up of abnormal screening result',
+      destinationFacility: 'CHC Bero',
+      referralDate: addDays(TODAY, -1),
+      urgency: 'routine',
+      patientIntention: 'will_attend',
+      facility: { ...emptyFacility(), response: 'accepted' },
+      worker: {
+        facilityResponse: 'accepted',
+        appointmentDate: '2026-10-06',
+        appointmentCertainty: 'tentative',
+      },
+    });
+    expect(inboxTab(ref)).toBe('accepted');
+    const i = analyze(sunita, ref, [], NOW);
+    expect(i.careState).toBe('accepted_no_appt');
+    expect(i.action).toBe('confirm_appointment');
+    const fact = (k: string) => i.facts.find((f) => f.key === k)!;
+    expect(fact('fact.facilityResponse').valueKey).toBe('response.accepted');
+    expect(fact('fact.attendance').state).toBe('na');
+  });
+});
+

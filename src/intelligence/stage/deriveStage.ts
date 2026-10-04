@@ -35,8 +35,8 @@ export function deriveCaseStageFromDraft(input: DraftStageInput): CaseStageKey {
   const parsed = input.parsed;
   const appt = parsed.appointmentDate;
 
-  if (parsed.facilityAccepted && appt && appt < now) return 'follow_up_due';
-  if (appt) return 'appointment_scheduled';
+  if (parsed.facilityAccepted && appt && appt < now && !parsed.appointmentTentative) return 'follow_up_due';
+  if (appt && !parsed.appointmentTentative) return 'appointment_scheduled';
   if (parsed.facilityAccepted) return 'referral_accepted';
 
   const dest = (input.destinationFacility || parsed.destinationFacility || '').trim();
