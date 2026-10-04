@@ -46,6 +46,10 @@ export function CaseStageSummary({
     appointmentDate: referral.worker.appointmentDate ?? referral.facility.appointmentDate ?? '',
     patientIntention: referral.patientIntention ?? '',
     facilityResponse: referral.worker.facilityResponse ?? referral.facility.response,
+    screeningCompleted: referral.screening?.completed ?? false,
+    screeningArea: referral.screening?.area ?? '',
+    screeningFinding: referral.screening?.finding ?? '',
+    referralRequired: referral.screening?.referralRequired ?? '',
   });
 
   const rowByKey = Object.fromEntries(rows.map((r) => [r.key, r]));

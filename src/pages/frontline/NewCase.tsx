@@ -30,6 +30,7 @@ import {
 } from '../../intelligence/stage/deriveStage';
 import { useSettings } from '../../settings';
 import { useConnectivity } from '../../sync/connectivity';
+import { useVoiceDictation, type DictationSampleKey } from '../../voice/useVoiceDictation';
 
 const FACILITY_SUGGESTIONS = [
   'Sadar District Hospital',
@@ -113,21 +114,6 @@ function toDrafts(f: FormState, appointmentTentative: boolean): { p: PatientDraf
   };
 }
 
-// Minimal typing for the Web Speech API (not in TS DOM lib).
-type SpeechRec = {
-  lang: string;
-  interimResults: boolean;
-  onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-  onend: () => void;
-  onerror: () => void;
-  start: () => void;
-  stop: () => void;
-};
-function getSpeechRecognition(): (new () => SpeechRec) | undefined {
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
-
 export function NewCase() {
   const { id } = useParams();
   const [params] = useSearchParams();
@@ -151,11 +137,27 @@ export function NewCase() {
   const [appointmentTentative, setAppointmentTentative] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<SpeechRec | null>(null);
+  const [selectedSample, setSelectedSample] = useState<DictationSampleKey>(
+    lang === 'hi' ? 'hindi' : 'en',
+  );
   const reviewDialogRef = useRef<HTMLDialogElement>(null);
   const describeHostRef = useRef<HTMLDivElement>(null);
-  const SR = getSpeechRecognition();
+
+  const {
+    isListening,
+    activeMode,
+    toggle: toggleVoice,
+  } = useVoiceDictation({
+    lang,
+    online,
+    selectedSample,
+    onTranscript: (spokenText) => {
+      applyDescribeText(spokenText);
+    },
+    onComplete: (completedText) => {
+      understand(completedText);
+    },
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -231,27 +233,6 @@ export function NewCase() {
     }));
   }
 
-  function toggleMic() {
-    if (!SR || !online) return;
-    if (listening) {
-      recRef.current?.stop();
-      return;
-    }
-    const rec = new SR();
-    rec.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      const said = Array.from(e.results)
-        .map((r) => r[0].transcript)
-        .join(' ');
-      applyDescribeText(text ? `${text} ${said}` : said);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    rec.start();
-  }
 
   // Live preview of what the Small AI will flag for this draft.
   const preview = useMemo(() => {
@@ -395,8 +376,9 @@ export function NewCase() {
                 <button
                   key={k}
                   type="button"
-                  className="btn btn-secondary !min-h-[44px] text-[0.9rem]"
+                  className={`btn ${selectedSample === k ? 'btn-primary' : 'btn-secondary'} !min-h-[44px] text-[0.9rem]`}
                   onClick={() => {
+                    setSelectedSample(k);
                     setText(EXAMPLES[k]);
                     understand(EXAMPLES[k]);
                   }}
@@ -407,23 +389,45 @@ export function NewCase() {
             </div>
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-2">
-            <button type="button" className="btn btn-accent" onClick={() => understand()} disabled={!text.trim()} data-testid="understand">
+            <button type="button" className="btn btn-accent" onClick={() => understand()} disabled={!text.trim() || isListening} data-testid="understand">
               <Icon name="spark" size={18} />
               {t('new.understand')}
             </button>
             <button
               type="button"
-              className="btn btn-secondary"
-              onClick={toggleMic}
-              disabled={!SR || !online}
-              aria-pressed={listening}
-              title={!online ? t('new.micOffline') : !SR ? t('new.micUnsupported') : undefined}
+              className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'} flex items-center gap-1.5`}
+              onClick={() => toggleVoice(selectedSample)}
+              aria-pressed={isListening}
+              data-testid="speak-button"
+              title={!online ? t('new.micOfflineHint') : undefined}
             >
-              <Icon name="mic" size={18} className={listening ? 'animate-pulse text-danger' : ''} />
-              {listening ? t('new.micListening') : t('new.mic')}
+              <Icon
+                name={isListening ? (activeMode === 'sample' ? 'speaker' : 'mic') : 'mic'}
+                size={18}
+                className={isListening ? 'animate-pulse text-danger' : ''}
+              />
+              <span>
+                {isListening
+                  ? activeMode === 'sample'
+                    ? t('new.micPlayingSample')
+                    : t('new.micListening')
+                  : !online
+                    ? t('new.micOfflineDemo')
+                    : t('new.mic')}
+              </span>
+              {!online && !isListening && (
+                <span className="ml-1 rounded bg-brand/10 px-1.5 py-0.5 text-[0.7rem] font-semibold text-brand">
+                  Offline
+                </span>
+              )}
             </button>
           </div>
-          {(!online || !SR) && <p className="text-[0.85rem] text-muted">{!online ? t('new.micOffline') : t('new.micUnsupported')}</p>}
+          {!online && (
+            <p className="flex items-center gap-1.5 text-[0.85rem] text-muted">
+              <Icon name="offline" size={14} className="shrink-0 text-accent" />
+              <span>{t('new.micOfflineHint')}</span>
+            </p>
+          )}
           {parsed && describeInSync && (
             <div className="space-y-2">
               <button
