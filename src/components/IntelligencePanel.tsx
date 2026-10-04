@@ -112,8 +112,6 @@ export function IntelligencePanel({ intel, referralId }: { intel: Intelligence; 
             ))}
           </ul>
         </details>
-
-        <p className="text-[0.78rem] text-muted">{t('intel.demoLabel')}</p>
       </div>
     </section>
   );
