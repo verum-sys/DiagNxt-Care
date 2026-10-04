@@ -18,10 +18,16 @@
   --color-info-soft: #e0ecf7;
 }
 
-/* Readability spec: 18px base, 48px tap targets, text-labelled buttons. */
+/* Mobile-first responsive readability spec: 15.5px base on mobile, 18px on tablets/desktop */
 html {
-  font-size: 18px;
+  font-size: 15.5px;
   -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 640px) {
+  html {
+    font-size: 18px;
+  }
 }
 
 body {
@@ -30,6 +36,9 @@ body {
   color: var(--color-ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
   line-height: 1.45;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 button, input, select, textarea {
@@ -37,19 +46,38 @@ button, input, select, textarea {
 }
 
 button, a[role="button"], label.tap {
-  min-height: 48px;
+  min-height: 44px;
+}
+
+@media (min-width: 640px) {
+  button, a[role="button"], label.tap {
+    min-height: 48px;
+  }
 }
 
 input, select, textarea {
-  min-height: 48px;
+  font-size: 16px; /* Prevents iOS Safari auto-zoom on focus */
+  min-height: 44px;
   width: 100%;
   border: 1px solid var(--color-line);
   border-radius: 0.75rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.55rem 0.8rem;
   background: #fff;
+  box-sizing: border-box;
 }
 
-textarea { min-height: 7rem; }
+@media (min-width: 640px) {
+  input, select, textarea {
+    min-height: 48px;
+    padding: 0.6rem 0.85rem;
+  }
+}
+
+textarea { min-height: 6.5rem; }
+
+@media (min-width: 640px) {
+  textarea { min-height: 7rem; }
+}
 
 input:focus, select:focus, textarea:focus, button:focus-visible {
   outline: 3px solid #7cc4f5;
@@ -60,15 +88,28 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  min-height: 48px;
-  padding: 0.6rem 1.1rem;
-  border-radius: 0.85rem;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.75rem;
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
   text-align: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
+
+@media (min-width: 640px) {
+  .btn {
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 0.85rem;
+  }
+}
+
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--color-brand); color: #fff; }
 .btn-primary:hover { background: var(--color-brand-dark); }
@@ -80,22 +121,39 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .card {
   background: #fff;
   border: 1px solid var(--color-line);
-  border-radius: 1rem;
-  padding: 1rem;
+  border-radius: 0.875rem;
+  padding: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .card {
+    border-radius: 1rem;
+    padding: 1rem;
+  }
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.65rem;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.25;
   max-width: 100%;
   white-space: normal;
   text-align: left;
 }
+
+@media (min-width: 640px) {
+  .chip {
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.85rem;
+  }
+}
+
 
 /* Highlighted describe textarea — mirror layer + transparent input */
 .highlight-ta-wrap {
@@ -170,9 +228,16 @@ mark.highlight-field-active {
 dialog.review-dialog {
   border: 1px solid var(--color-line);
   border-radius: 1rem;
-  padding: 1.25rem;
-  max-width: min(32rem, calc(100vw - 2rem));
+  padding: 1rem;
+  max-width: calc(100vw - 1.5rem);
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.15);
+  margin: auto;
+}
+@media (min-width: 640px) {
+  dialog.review-dialog {
+    padding: 1.25rem;
+    max-width: min(32rem, calc(100vw - 2rem));
+  }
 }
 dialog.review-dialog::backdrop {
   background: rgb(11 59 92 / 0.35);

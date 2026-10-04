@@ -53,14 +53,15 @@ export function Home() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-[1.35rem] font-bold">{t('home.greeting', { name: workerName })}</h1>
-        <Link to="/sync" className="btn btn-ghost !px-2 text-[0.9rem]">
-          {t('home.sync')}
+        <h1 className="text-xl sm:text-[1.35rem] font-bold truncate">{t('home.greeting', { name: workerName })}</h1>
+        <Link to="/sync" className="btn btn-ghost !min-h-[38px] !px-2.5 text-[0.85rem] sm:text-[0.9rem] shrink-0">
+          <Icon name="sync" size={16} />
+          <span>{t('home.sync')}</span>
         </Link>
       </div>
 
-      <Link to="/new" className="btn btn-primary btn-block !min-h-[56px] text-lg" role="button" data-testid="new-case">
-        <Icon name="plus" size={22} />
+      <Link to="/new" className="btn btn-primary btn-block !min-h-[48px] sm:!min-h-[56px] text-base sm:text-lg shadow-sm" role="button" data-testid="new-case">
+        <Icon name="plus" size={20} />
         {t('home.newCase')}
       </Link>
 

@@ -107,9 +107,9 @@ export function CaseStageSummary({
         {rows
           .filter((r) => r.key !== 'caseStage')
           .map((row) => (
-            <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line/70 py-1.5">
-              <span className="text-muted">{t(row.labelKey)}</span>
-              <span className="text-right">
+            <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line/70 py-1.5 text-[0.85rem] sm:text-[0.9rem]">
+              <span className="text-muted min-w-0">{t(row.labelKey)}</span>
+              <span className="text-right shrink-0">
                 {(row.status === 'known' || row.status === 'tentative') && display(row) ? (
                   <span className="font-semibold">{display(row)}</span>
                 ) : row.displayValueKey && row.status !== 'unknown' ? (
@@ -122,7 +122,7 @@ export function CaseStageSummary({
             </li>
           ))}
       </ul>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         {checklistSection('draft.checklist.complete', expectations.complete)}
         {checklistSection('draft.checklist.pending', expectations.pending)}
         {checklistSection('draft.checklist.notApplicable', expectations.notApplicable)}

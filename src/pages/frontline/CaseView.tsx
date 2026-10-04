@@ -13,9 +13,9 @@ import { analyze } from '../../intelligence/engine';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-3 py-1.5">
+    <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 py-1.5 text-[0.88rem] sm:text-base">
       <dt className="text-muted">{label}</dt>
-      <dd className="text-right font-semibold">{children}</dd>
+      <dd className="text-right font-semibold break-words max-w-full">{children}</dd>
     </div>
   );
 }

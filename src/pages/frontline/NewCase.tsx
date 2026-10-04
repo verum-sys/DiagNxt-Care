@@ -371,12 +371,12 @@ export function NewCase() {
           <div>
             <div className="mb-1 text-[0.85rem] font-semibold text-muted">{t('new.examples')}</div>
             <p className="mb-2 text-[0.85rem] text-muted">{t('new.examplesHint')}</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
               {(['en', 'hinglish', 'hindi'] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
-                  className={`btn ${selectedSample === k ? 'btn-primary' : 'btn-secondary'} !min-h-[44px] text-[0.9rem]`}
+                  className={`btn ${selectedSample === k ? 'btn-primary' : 'btn-secondary'} !min-h-[38px] sm:!min-h-[44px] !px-2 text-[0.82rem] sm:text-[0.9rem]`}
                   onClick={() => {
                     setSelectedSample(k);
                     setText(EXAMPLES[k]);
@@ -388,14 +388,20 @@ export function NewCase() {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <button type="button" className="btn btn-accent" onClick={() => understand()} disabled={!text.trim() || isListening} data-testid="understand">
+          <div className="grid grid-cols-1 gap-2 xs:grid-cols-2 sm:grid-cols-2">
+            <button
+              type="button"
+              className="btn btn-accent !min-h-[46px] w-full text-[0.92rem] sm:text-base font-semibold"
+              onClick={() => understand()}
+              disabled={!text.trim() || isListening}
+              data-testid="understand"
+            >
               <Icon name="spark" size={18} />
               {t('new.understand')}
             </button>
             <button
               type="button"
-              className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'} flex items-center gap-1.5`}
+              className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'} !min-h-[46px] w-full text-[0.88rem] sm:text-base font-semibold flex items-center justify-center gap-1.5`}
               onClick={() => toggleVoice(selectedSample)}
               aria-pressed={isListening}
               data-testid="speak-button"
@@ -406,7 +412,7 @@ export function NewCase() {
                 size={18}
                 className={isListening ? 'animate-pulse text-danger' : ''}
               />
-              <span>
+              <span className="truncate">
                 {isListening
                   ? activeMode === 'sample'
                     ? t('new.micPlayingSample')
@@ -416,15 +422,15 @@ export function NewCase() {
                     : t('new.mic')}
               </span>
               {!online && !isListening && (
-                <span className="ml-1 rounded bg-brand/10 px-1.5 py-0.5 text-[0.7rem] font-semibold text-brand">
+                <span className="shrink-0 rounded bg-brand/10 px-1.5 py-0.5 text-[0.68rem] font-bold text-brand uppercase tracking-wider">
                   Offline
                 </span>
               )}
             </button>
           </div>
           {!online && (
-            <p className="flex items-center gap-1.5 text-[0.85rem] text-muted">
-              <Icon name="offline" size={14} className="shrink-0 text-accent" />
+            <p className="flex items-start sm:items-center gap-1.5 text-[0.8rem] sm:text-[0.85rem] text-muted">
+              <Icon name="offline" size={15} className="mt-0.5 shrink-0 text-accent sm:mt-0" />
               <span>{t('new.micOfflineHint')}</span>
             </p>
           )}
@@ -462,9 +468,9 @@ export function NewCase() {
           )}
           <ul className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             {draftBundle.rows.map((row) => (
-              <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line/70 py-1.5">
-                <span className="text-muted">{t(row.labelKey)}</span>
-                <span className="text-right">
+              <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line/70 py-1.5 text-[0.85rem] sm:text-[0.9rem]">
+                <span className="text-muted min-w-0">{t(row.labelKey)}</span>
+                <span className="text-right shrink-0">
                   {(row.status === 'known' || row.status === 'tentative') && draftRowDisplay(row) ? (
                     <button
                       type="button"
@@ -483,7 +489,7 @@ export function NewCase() {
               </li>
             ))}
           </ul>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
             {renderChecklist('draft.checklist.complete', getStageExpectations(draftBundle.stage).complete)}
             {renderChecklist('draft.checklist.pending', getStageExpectations(draftBundle.stage).pending)}
             {renderChecklist('draft.checklist.notApplicable', getStageExpectations(draftBundle.stage).notApplicable)}

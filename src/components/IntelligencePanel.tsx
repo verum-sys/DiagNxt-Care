@@ -88,11 +88,12 @@ export function IntelligencePanel({ intel, referralId }: { intel: Intelligence; 
               {reasonText}
             </p>
             <p className="mt-1 text-[0.9rem] italic text-muted">{t('reason.youDecide')}</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-              <Link to={takeHref} className="btn btn-primary btn-block" role="button">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+              <Link to={takeHref} className="btn btn-primary btn-block text-center" role="button">
                 {t('intel.take')}
               </Link>
               <SpeakButton
+                className="w-full sm:w-auto"
                 segments={[
                   { key: `careState.${intel.careState}` },
                   { key: 'intel.suggested' },
