@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makePatient, makeReferral } from '../../db/factory';
 import { deriveFacts } from '../facts';
-import { parseFreeText } from '../parser';
 import { DEMO_CASE_TEXT } from '../demoCases';
 import { parseFreeText } from '../parser';
 import { deriveCaseStageFromDraft, deriveCaseStageSaved, getStageExpectations } from './deriveStage';

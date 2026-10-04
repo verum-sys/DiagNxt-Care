@@ -6,6 +6,7 @@ import { useLang } from './i18n';
 import { Inbox } from './pages/facility/Inbox';
 import { ReferralDetail } from './pages/facility/ReferralDetail';
 import { CaseView } from './pages/frontline/CaseView';
+import { CategoryCases } from './pages/frontline/CategoryCases';
 import { Home } from './pages/frontline/Home';
 import { NewCase } from './pages/frontline/NewCase';
 import { RecordFollowUp } from './pages/frontline/RecordFollowUp';
@@ -41,6 +42,8 @@ export function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/new" element={<NewCase />} />
+          <Route path="/cases" element={<CategoryCases />} />
+          <Route path="/cases/:category" element={<CategoryCases />} />
           <Route path="/case/:id" element={<CaseView />} />
           <Route path="/case/:id/edit" element={<NewCase />} />
           <Route path="/case/:id/follow-up" element={<RecordFollowUp />} />

@@ -7,7 +7,7 @@ import { getDB, getMeta, notifyChange } from './db';
 import { emptyFacility, makePatient, makeReferral } from './factory';
 import type { FacilityEvent, FollowUp, Patient, Referral } from './types';
 
-const SEED_VERSION = 1;
+const SEED_VERSION = 2;
 export const DEFAULT_WORKER = 'ASHA Rekha Devi';
 
 function iso(day: string, hour = 10): string {
@@ -40,7 +40,7 @@ function build() {
       notes: 'She said she would go. No word from the hospital yet.',
       syncStatus: 'pending',
     }),
-    // 2. Accepted by facility, no appointment yet.
+    // 2. Accepted by facility with appointment scheduled in 4 days.
     makeReferral({
       id: 'REF-0002',
       patientId: 'CL-0002',
@@ -51,7 +51,7 @@ function build() {
       notes: '',
       syncStatus: 'synced',
       lastSyncedAt: synced(addDays(t, -4)),
-      facility: { ...emptyFacility(), response: 'accepted', updatedAt: iso(addDays(t, -2), 11) },
+      facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, 4), updatedAt: iso(addDays(t, -1), 11) },
     }),
     // 3. Appointment scheduled in 3 days; patient intention not confirmed.
     makeReferral({
@@ -66,7 +66,7 @@ function build() {
       lastSyncedAt: synced(addDays(t, -6)),
       facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, 3), updatedAt: iso(addDays(t, -3), 12) },
     }),
-    // 4. Appointment 4 days ago, attendance unknown, urgent — should be top priority.
+    // 4. Appointment 4 days ago, patient confirmed did not attend, urgent.
     makeReferral({
       id: 'REF-0004',
       patientId: 'CL-0004',
@@ -78,7 +78,7 @@ function build() {
       notes: '',
       syncStatus: 'synced',
       lastSyncedAt: synced(addDays(t, -1)),
-      facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, -4), updatedAt: iso(addDays(t, -9), 9) },
+      facility: { ...emptyFacility(), response: 'accepted', appointmentDate: addDays(t, -4), attendance: 'not_attended', updatedAt: iso(addDays(t, -3), 10) },
     }),
     // 5. Referral information incomplete (no destination facility, no phone).
     makeReferral({
@@ -96,19 +96,21 @@ function build() {
   const followUps: FollowUp[] = [
     { id: 'fu-seed-1', referralId: 'REF-0003', at: iso(addDays(t, -3), 16), action: 'contacted_patient', note: 'Told her the appointment date. She is not sure she can travel.', data: { intention: 'unsure' }, suggestedAction: 'remind_patient', syncStatus: 'synced' },
     { id: 'fu-seed-2', referralId: 'REF-0004', at: iso(addDays(t, -9), 15), action: 'appointment_confirmed', note: 'Ramesh confirmed he will go with his son.', data: { date: addDays(t, -4) }, suggestedAction: 'remind_patient', syncStatus: 'synced' },
-    { id: 'fu-seed-3', referralId: 'REF-0004', at: iso(addDays(t, -1), 17), action: 'unable_to_reach', note: 'Phone switched off.', suggestedAction: 'check_attendance', syncStatus: 'synced' },
+    { id: 'fu-seed-3', referralId: 'REF-0004', at: iso(addDays(t, -1), 17), action: 'unable_to_reach', note: 'Phone switched off.', suggestedAction: 'reschedule', syncStatus: 'synced' },
   ];
   // Reflect seeded follow-ups in the worker facts / intention.
   referrals[2].patientIntention = 'unsure';
-  referrals[3].worker = { appointmentDate: addDays(t, -4), facilityResponse: 'accepted' };
+  referrals[3].worker = { appointmentDate: addDays(t, -4), facilityResponse: 'accepted', attendance: 'not_attended' };
 
   const facilityEvents: FacilityEvent[] = [
     { id: 'fe-seed-1', referralId: 'REF-0002', at: iso(addDays(t, -3), 10), kind: 'acknowledged' },
-    { id: 'fe-seed-2', referralId: 'REF-0002', at: iso(addDays(t, -2), 11), kind: 'accepted', text: 'Will share appointment slot soon.' },
+    { id: 'fe-seed-2', referralId: 'REF-0002', at: iso(addDays(t, -2), 11), kind: 'accepted', text: 'Specialist consultation approved.' },
+    { id: 'fe-seed-2b', referralId: 'REF-0002', at: iso(addDays(t, -1), 11), kind: 'scheduled', text: addDays(t, 4) },
     { id: 'fe-seed-3', referralId: 'REF-0003', at: iso(addDays(t, -3), 12), kind: 'scheduled', text: addDays(t, 3) },
     { id: 'fe-seed-4', referralId: 'REF-0004', at: iso(addDays(t, -9), 9), kind: 'scheduled', text: addDays(t, -4) },
+    { id: 'fe-seed-4b', referralId: 'REF-0004', at: iso(addDays(t, -3), 10), kind: 'not_attended', text: 'Patient did not attend scheduled appointment.' },
   ];
-  referrals[1].facility.notes = [{ at: iso(addDays(t, -2), 11), text: 'Will share appointment slot soon.' }];
+  referrals[1].facility.notes = [{ at: iso(addDays(t, -1), 11), text: 'Appointment slot allocated for follow-up.' }];
 
   return { patients, referrals, followUps, facilityEvents };
 }

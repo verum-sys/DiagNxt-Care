@@ -74,7 +74,17 @@ export function ReferralDetail() {
             <Chip tone={f.response === 'accepted' ? 'ok' : f.response === 'declined' ? 'danger' : 'warn'}>{t(`response.${f.response}`)}</Chip>
           </Row>
           <Row label={t('fact.appointment')}>{f.appointmentDate ? formatDate(f.appointmentDate) : '—'}</Row>
-          <Row label={t('fact.attendance')}>{t(`attendance.${f.attendance}`)}</Row>
+          <Row label={t('fact.attendance')}>
+            {!f.appointmentDate || f.appointmentDate >= today() ? (
+              <Chip tone="neutral">{t('factState.na')}</Chip>
+            ) : f.attendance === 'attended' ? (
+              <Chip tone="ok">{t('attendance.attended')}</Chip>
+            ) : f.attendance === 'not_attended' ? (
+              <Chip tone="danger">{t('attendance.not_attended')}</Chip>
+            ) : (
+              <Chip tone="warn">{t('attendance.unknown')}</Chip>
+            )}
+          </Row>
           {referral.notes && <Row label={t('case.notes')}>{referral.notes}</Row>}
         </dl>
       </section>
