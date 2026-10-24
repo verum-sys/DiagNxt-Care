@@ -46,51 +46,6 @@ export interface FacilityFacts {
   updatedAt?: string;
 }
 
-export type CareTier = 'asha' | 'phc' | 'dh' | 'tcc';
-export type CareUnit = 'a' | 'b' | 'c';
-
-export interface PhysicalExamNotes {
-  bpSystolic?: number;
-  bpDiastolic?: number;
-  pulseRate?: number;
-  spo2?: number;
-  temperature?: number;
-  heightCm?: number;
-  weightKg?: number;
-  bmi?: number;
-  generalFindings?: string;
-  systemicExam?: string;
-  oralCavityFindings?: string;
-  breastExamFindings?: string;
-  cervicalExamFindings?: string;
-  recordedAt?: string;
-  recordedBy?: string;
-}
-
-export interface ReportAttachment {
-  id: string;
-  title: string;
-  fileName: string;
-  fileSize: string;
-  fileType: string;
-  category: 'general' | 'biopsy' | 'radiology';
-  uploadedAt: string;
-  uploadedBy: string;
-  findings?: string;
-  fileUrl?: string;
-  dataUrl?: string;
-}
-
-export interface TierNote {
-  id: string;
-  tier: CareTier;
-  unit: CareUnit;
-  author: string;
-  text: string;
-  category?: 'clinical' | 'tumor_board' | 'multidisciplinary' | 'staging' | 'general';
-  at: string;
-}
-
 export interface Referral {
   id: string;
   patientId: string;
@@ -104,16 +59,6 @@ export interface Referral {
   screening?: ScreeningInfo;
   worker: WorkerFacts;
   facility: FacilityFacts;
-  tier?: CareTier;
-  unit?: CareUnit;
-  physicalExam?: PhysicalExamNotes;
-  dhNotes?: string;
-  tccNotes?: string;
-  tierNotes?: TierNote[];
-  reports?: ReportAttachment[];
-  biopsyReports?: ReportAttachment[];
-  radiologyReports?: ReportAttachment[];
-  aiSummaryOverride?: string;
   createdAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
@@ -203,7 +148,6 @@ export interface ScreeningInfo {
   area?: ScreeningArea;
   finding?: ScreeningFinding;
   referralRequired?: ReferralRequiredAnswer;
-  cbac?: import('../intelligence/cbacTypes').CbacAssessment;
 }
 
 export type DraftFieldKey =

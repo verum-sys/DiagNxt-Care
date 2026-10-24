@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HighlightedTextarea, scrollToHighlightField } from '../../components/HighlightedTextarea';
 import { BackLink } from '../../components/Layout';
 import { Icon } from '../../components/Icon';
@@ -571,26 +571,6 @@ export function NewCase() {
         <fieldset className="card space-y-3">
           <legend className="px-1 text-lg font-bold">{t('new.screeningSection')}</legend>
           <p className="text-[0.9rem] text-muted">{t('new.screeningSectionHint')}</p>
-
-          <div className="rounded-2xl border-2 border-accent/40 bg-accent-soft/50 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div>
-              <div className="font-bold text-sm sm:text-base text-brand flex items-center gap-1.5">
-                <Icon name="spark" size={18} className="text-accent" />
-                Community Based Assessment Checklist (CBAC)
-              </div>
-              <p className="text-xs sm:text-[0.82rem] text-muted">
-                Complete slide-based Parts A–D with smart age and waist auto-clicking.
-              </p>
-            </div>
-            <Link
-              to={id ? `/case/${id}/cbac` : `/cbac?name=${encodeURIComponent(form.name)}&age=${encodeURIComponent(form.age)}&sex=${encodeURIComponent(form.sex)}`}
-              className="btn btn-accent !min-h-[40px] text-xs sm:text-sm font-bold shrink-0 flex items-center gap-1.5"
-            >
-              <span>Launch Smart CBAC</span>
-              <Icon name="chevron" size={16} />
-            </Link>
-          </div>
-
           <label className="flex cursor-pointer items-center gap-2 font-semibold">
             <input
               type="checkbox"

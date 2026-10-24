@@ -28,9 +28,8 @@ async function clipBlobUrl(src: string): Promise<string> {
 
 type SpeechRec = {
   lang: string;
-  continuous: boolean;
   interimResults: boolean;
-  onresult: ((e: any) => void) | null;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   start: () => void;
@@ -47,7 +46,6 @@ export interface UseVoiceDictationOptions {
   lang: Lang;
   online: boolean;
   selectedSample?: DictationSampleKey;
-  disableSampleFallback?: boolean;
   onTranscript: (text: string, isFinal: boolean) => void;
   onComplete?: (text: string) => void;
 }
@@ -56,7 +54,6 @@ export function useVoiceDictation({
   lang,
   online,
   selectedSample,
-  disableSampleFallback = false,
   onTranscript,
   onComplete,
 }: UseVoiceDictationOptions) {
@@ -67,11 +64,9 @@ export function useVoiceDictation({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCancelledRef = useRef(false);
-  const transcriptRef = useRef('');
 
   const stop = useCallback(() => {
     isCancelledRef.current = true;
-    transcriptRef.current = '';
     if (recRef.current) {
       try {
         recRef.current.stop();
@@ -166,69 +161,35 @@ export function useVoiceDictation({
   const startMicDictation = useCallback(() => {
     const SR = getSpeechRecognition();
     if (!SR || !online) {
-      if (!disableSampleFallback) {
-        void startSampleDictation();
-      }
+      void startSampleDictation();
       return;
     }
 
     stop();
     isCancelledRef.current = false;
-    transcriptRef.current = '';
     setIsListening(true);
     setActiveMode('mic');
 
     const rec = new SR();
-    rec.continuous = true;
+    rec.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
     rec.interimResults = true;
-    rec.lang = lang === 'hi' ? 'hi-IN' : 'en-US';
 
-    rec.onresult = (e: any) => {
+    rec.onresult = (e) => {
       if (isCancelledRef.current) return;
-      let interimTranscript = '';
-      let finalTranscript = '';
-
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const piece = e.results[i][0].transcript;
-        if (e.results[i].isFinal) {
-          finalTranscript += piece + ' ';
-        } else {
-          interimTranscript += piece;
-        }
-      }
-
-      if (finalTranscript) {
-        transcriptRef.current = (
-          transcriptRef.current ? transcriptRef.current + ' ' + finalTranscript : finalTranscript
-        ).trim();
-      }
-
-      const currentFull = transcriptRef.current;
-      const combined = interimTranscript
-        ? (currentFull ? currentFull + ' ' + interimTranscript : interimTranscript).trim()
-        : currentFull;
-
-      if (combined) {
-        onTranscript(combined, !interimTranscript);
-        if (!interimTranscript && finalTranscript) {
-          onComplete?.(currentFull);
-        }
+      const said = Array.from(e.results)
+        .map((r) => r[0].transcript)
+        .join(' ');
+      const isFinal = Array.from(e.results).every((r) => (r as any).isFinal);
+      onTranscript(said, isFinal);
+      if (isFinal) {
+        onComplete?.(said);
       }
     };
 
-    rec.onerror = (e) => {
-      console.warn('Speech recognition error:', e.error);
-      if (e.error === 'no-speech') {
-        // Continuous mode in WebKit/Blink can emit no-speech on short silence; don't cancel
-        return;
-      }
+    rec.onerror = () => {
+      // If mic fails (e.g. offline network error), fallback to sample dictation
       if (!isCancelledRef.current) {
-        if (!disableSampleFallback) {
-          void startSampleDictation();
-        } else {
-          setIsListening(false);
-          setActiveMode(null);
-        }
+        void startSampleDictation();
       }
     };
 
@@ -236,9 +197,6 @@ export function useVoiceDictation({
       if (!isCancelledRef.current && activeMode === 'mic') {
         setIsListening(false);
         setActiveMode(null);
-        if (transcriptRef.current.trim()) {
-          onComplete?.(transcriptRef.current.trim());
-        }
       }
     };
 
@@ -246,28 +204,21 @@ export function useVoiceDictation({
     try {
       rec.start();
     } catch {
-      if (!disableSampleFallback) {
-        void startSampleDictation();
-      } else {
-        setIsListening(false);
-        setActiveMode(null);
-      }
+      void startSampleDictation();
     }
-  }, [online, lang, onTranscript, onComplete, startSampleDictation, stop, activeMode, disableSampleFallback]);
+  }, [online, lang, onTranscript, onComplete, startSampleDictation, stop, activeMode]);
 
   const toggle = useCallback(
     (sampleKey?: DictationSampleKey) => {
       if (isListening) {
         stop();
-      } else if (sampleKey) {
-        void startSampleDictation(sampleKey);
-      } else if (online && getSpeechRecognition()) {
+      } else if (online && getSpeechRecognition() && !sampleKey) {
         startMicDictation();
-      } else if (!disableSampleFallback) {
-        void startSampleDictation(defaultSampleKey);
+      } else {
+        void startSampleDictation(sampleKey ?? defaultSampleKey);
       }
     },
-    [isListening, online, defaultSampleKey, startMicDictation, startSampleDictation, stop, disableSampleFallback],
+    [isListening, online, defaultSampleKey, startMicDictation, startSampleDictation, stop],
   );
 
   return {

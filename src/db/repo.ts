@@ -7,8 +7,6 @@ import { emptyFacility } from './factory';
 import type {
   ActionKey,
   AppointmentCertainty,
-  CareTier,
-  CareUnit,
   FacilityEvent,
   FacilityResponse,
   FollowUp,
@@ -16,12 +14,8 @@ import type {
   Intention,
   OutboxItem,
   Patient,
-  PhysicalExamNotes,
   Referral,
-  ReportAttachment,
   SyncEvent,
-  TierNote,
-  Urgency,
 } from './types';
 
 export interface CaseRecord {
@@ -76,21 +70,7 @@ export type PatientDraft = Pick<Patient, 'name' | 'age' | 'sex' | 'phone' | 'loc
 export type ReferralDraft = Pick<
   Referral,
   'reason' | 'destinationFacility' | 'referralDate' | 'urgency' | 'notes' | 'patientIntention' | 'screening'
-> & {
-  appointmentDate?: string;
-  facilityResponse?: FacilityResponse;
-  appointmentCertainty?: AppointmentCertainty;
-  tier?: CareTier;
-  unit?: CareUnit;
-  physicalExam?: PhysicalExamNotes;
-  dhNotes?: string;
-  tccNotes?: string;
-  tierNotes?: TierNote[];
-  reports?: ReportAttachment[];
-  biopsyReports?: ReportAttachment[];
-  radiologyReports?: ReportAttachment[];
-  aiSummaryOverride?: string;
-};
+> & { appointmentDate?: string; facilityResponse?: FacilityResponse; appointmentCertainty?: AppointmentCertainty };
 
 export async function createCase(p: PatientDraft, r: ReferralDraft, referringWorker: string): Promise<string> {
   const db = await getDB();
@@ -104,8 +84,6 @@ export async function createCase(p: PatientDraft, r: ReferralDraft, referringWor
     id: referralId,
     patientId,
     referringWorker,
-    tier: rest.tier || 'asha',
-    unit: rest.unit || 'a',
     worker: {
       appointmentDate: appointmentDate || undefined,
       facilityResponse,
@@ -231,98 +209,4 @@ export async function outboxCount(): Promise<number> {
 export async function listSyncEvents(): Promise<SyncEvent[]> {
   const all = await (await getDB()).getAll('sync_events');
   return all.sort((a, b) => (a.at < b.at ? 1 : -1));
-}
-
-export async function updateCaseClinical(
-  referralId: string,
-  updates: Partial<Pick<Referral, 'tier' | 'unit' | 'physicalExam' | 'dhNotes' | 'tccNotes' | 'reports' | 'biopsyReports' | 'radiologyReports' | 'aiSummaryOverride' | 'notes'>>
-): Promise<void> {
-  const db = await getDB();
-  const current = await db.get('referrals', referralId);
-  if (!current) throw new Error('Referral not found');
-  const now = new Date().toISOString();
-  const updated: Referral = {
-    ...current,
-    ...updates,
-    updatedAt: now,
-    syncStatus: 'pending',
-  };
-  const tx = db.transaction(['referrals', 'outbox'], 'readwrite');
-  await tx.objectStore('referrals').put(updated);
-  await tx.objectStore('outbox').put(outboxItem('referral', referralId));
-  await tx.done;
-  notifyChange();
-}
-
-export async function addCaseAttachment(
-  referralId: string,
-  attachment: ReportAttachment
-): Promise<void> {
-  const db = await getDB();
-  const current = await db.get('referrals', referralId);
-  if (!current) throw new Error('Referral not found');
-  const now = new Date().toISOString();
-  const cat = attachment.category;
-  const updated: Referral = {
-    ...current,
-    reports: cat === 'general' ? [...(current.reports || []), attachment] : current.reports,
-    biopsyReports: cat === 'biopsy' ? [...(current.biopsyReports || []), attachment] : current.biopsyReports,
-    radiologyReports: cat === 'radiology' ? [...(current.radiologyReports || []), attachment] : current.radiologyReports,
-    updatedAt: now,
-    syncStatus: 'pending',
-  };
-  const fu: FollowUp = {
-    id: uid('fu-'),
-    referralId,
-    at: now,
-    action: 'details_completed',
-    note: `Attached ${cat} report: ${attachment.title} (${attachment.fileName})`,
-    syncStatus: 'pending',
-  };
-  const tx = db.transaction(['referrals', 'followups', 'outbox'], 'readwrite');
-  await tx.objectStore('referrals').put(updated);
-  await tx.objectStore('followups').put(fu);
-  await tx.objectStore('outbox').put(outboxItem('referral', referralId));
-  await tx.objectStore('outbox').put(outboxItem('followup', fu.id));
-  await tx.done;
-  notifyChange();
-}
-
-export async function referToNextTier(
-  referralId: string,
-  targetTier: CareTier,
-  destinationFacility: string,
-  notes?: string,
-  urgency?: Urgency,
-  targetUnit?: CareUnit
-): Promise<void> {
-  const db = await getDB();
-  const current = await db.get('referrals', referralId);
-  if (!current) throw new Error('Referral not found');
-  const now = new Date().toISOString();
-  const updated: Referral = {
-    ...current,
-    tier: targetTier,
-    unit: targetUnit || current.unit,
-    destinationFacility: destinationFacility || current.destinationFacility,
-    urgency: urgency || current.urgency,
-    notes: notes ? (current.notes ? `${current.notes}\n[Referral to ${targetTier.toUpperCase()}]: ${notes}` : notes) : current.notes,
-    updatedAt: now,
-    syncStatus: 'pending',
-  };
-  const fu: FollowUp = {
-    id: uid('fu-'),
-    referralId,
-    at: now,
-    action: 'referral_sent',
-    note: `Escalated case to ${targetTier.toUpperCase()}: ${destinationFacility}. ${notes || ''}`,
-    syncStatus: 'pending',
-  };
-  const tx = db.transaction(['referrals', 'followups', 'outbox'], 'readwrite');
-  await tx.objectStore('referrals').put(updated);
-  await tx.objectStore('followups').put(fu);
-  await tx.objectStore('outbox').put(outboxItem('referral', referralId));
-  await tx.objectStore('outbox').put(outboxItem('followup', fu.id));
-  await tx.done;
-  notifyChange();
 }

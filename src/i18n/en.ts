@@ -36,8 +36,6 @@ export const en = {
   'home.sync': 'Sync & settings',
   'home.cardNew': 'New Referral',
   'home.cardNewSub': 'Register patient',
-  'home.cardCbac': 'CBAC NCD & Referral',
-  'home.cardCbacSub': 'Screening + Facility Referral',
   'home.cardCritical': 'Critical',
   'home.cardCriticalSub': 'Immediate action',
   'home.cardPending': 'Pending',

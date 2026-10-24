@@ -177,7 +177,7 @@ function extractNameWithSpan(t: string): { value?: string; span?: FieldSpan } {
     { re: /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is\s+\d/, group: 1 },
     { re: new RegExp(`^([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
     { re: new RegExp(`श्रीमती\\s+([${DEV}]+(?:\\s+[${DEV}]+)?)\\s*,`), group: 1 },
-    { re: /\b(?:my\s+name\s+is|name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Za-z]+(?:\s[A-Za-z]+)?)/i, group: 1 },
+    { re: /\b(?:name is|named|naam|patient)\s+(?:is\s+)?(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b[Rr]eferred\s+(?:Mrs\.?\s|Smt\.?\s|Mr\.?\s|Shri\s)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b(?:Mrs\.?|Smt\.?|Mr\.?|Shri)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/, group: 1 },
     { re: /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+ko\b/, group: 1 },
