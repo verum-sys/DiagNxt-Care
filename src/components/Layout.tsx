@@ -1,78 +1,44 @@
-import type { ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { type ReactNode } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { UserButton } from '@clerk/clerk-react';
+import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n';
+import { homeForRole, ROLE_LABELS } from '../auth/access';
 import { Icon } from './Icon';
-import { InstallButton } from './InstallButton';
 import { StatusBar } from './StatusBar';
 
-/** App shell: brand header with role + language switches, persistent status bar, boundaries footer. */
 export function Layout({ children }: { children: ReactNode }) {
-  const { t, lang, setLang } = useLang();
+  const { user, isSuperAdmin, logout } = useAuth();
+  const { lang, setLang, t } = useLang();
   const location = useLocation();
-  const navigate = useNavigate();
-  const isFacility = location.pathname.startsWith('/facility');
-
-  return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="bg-brand text-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
-          <Link to={isFacility ? '/facility' : '/'} className="mr-auto leading-tight min-w-0">
-            <div className="text-[0.7rem] sm:text-[0.75rem] font-semibold uppercase tracking-wider text-teal-300 truncate">{t('app.by')}</div>
-            <div className="text-lg sm:text-xl font-bold truncate">{t('app.name')}</div>
-          </Link>
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <InstallButton />
-            <button
-              type="button"
-              onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-              className="btn !min-h-[36px] sm:!min-h-[40px] !px-2.5 sm:!px-3 !py-1 bg-white/10 text-white text-[0.8rem] sm:text-[0.85rem]"
-              aria-label="Change language"
-            >
-              {t('lang.toggle')}
-            </button>
-          </div>
-        </div>
-        <nav className="mx-auto flex max-w-2xl px-3 pb-2 sm:px-4" aria-label="Role">
-          <div className="grid w-full grid-cols-2 rounded-xl bg-white/10 p-1 text-[0.85rem] sm:text-[0.9rem]">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className={`flex min-h-[38px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg font-semibold ${!isFacility ? 'bg-white text-brand' : 'text-white/85'}`}
-              aria-pressed={!isFacility}
-            >
-              <Icon name="user" size={16} />
-              {t('role.frontline')}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/facility')}
-              className={`flex min-h-[38px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg font-semibold ${isFacility ? 'bg-white text-brand' : 'text-white/85'}`}
-              aria-pressed={isFacility}
-            >
-              <Icon name="building" size={16} />
-              {t('role.facility')}
-            </button>
-          </div>
-        </nav>
-      </header>
-
-      <StatusBar showSync={!isFacility} />
-
-      <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 sm:px-4 sm:py-4">{children}</main>
-
-      <footer className="border-t border-line bg-white">
-        <p className="mx-auto max-w-2xl px-3 py-2.5 sm:px-4 sm:py-3 text-center text-[0.75rem] sm:text-[0.8rem] font-semibold text-muted">{t('footer.boundaries')}</p>
-      </footer>
+  if (location.pathname === '/login') return <>{children}</>;
+  const tiers = [ ['asha', 'ASHA', 'Community screening'], ['phc', 'PHC', 'Primary health centre'], ['dh', 'District Hospital', 'Specialist diagnostics'], ['tcc', 'TCC', 'Tertiary cancer care'] ];
+  const cbacUrl = `/cbac?tier=asha&unit=${user.unit}`;
+  return <div className="care-shell">
+    <aside className="care-sidebar">
+      <Link to={homeForRole(user.role)} className="care-brand"><span className="brand-mark">✚</span><span>Diag<span className="text-teal-600">NXT</span><small>CONNECTED CARE</small></span></Link>
+      <div className="sidebar-label">WORKSPACE</div>
+      <nav className="care-nav" aria-label="Main navigation">
+        {!isSuperAdmin && <NavLink to="/workspace"><Icon name="building" size={18}/><span>My workspace</span></NavLink>}
+        {isSuperAdmin && <NavLink to="/" end><Icon name="spark" size={18}/><span>Overview</span></NavLink>}
+        {isSuperAdmin && <div className="sidebar-label">CARE NETWORK</div>}
+        {tiers.filter(() => isSuperAdmin).map(([key, name, desc]) => <NavLink key={key} to={`/tier/${key}`}><Icon name={key === 'asha' ? 'user' : 'building'} size={18}/><span>{name}<small>{desc}</small></span></NavLink>)}
+        <div className="sidebar-label">PATIENT CARE</div>
+        {isSuperAdmin && <NavLink to={cbacUrl}><Icon name="check" size={18}/><span>New CBAC form</span></NavLink>}
+        <NavLink to="/cases"><Icon name="user" size={18}/><span>Patient registry</span></NavLink>
+        <NavLink to="/sync"><Icon name="info" size={18}/><span>Sync & connectivity</span></NavLink>
+      </nav>
+      <div className="sidebar-bottom"><div className="network-status"><i/> {ROLE_LABELS[user.role]} workspace</div>{isSuperAdmin && <div className="text-xs text-slate-500 mt-2">ASHA → PHC → DH → TCC</div>}</div>
+    </aside>
+    <div className="care-workspace">
+      <header className="care-topbar"><div><span className="text-slate-400 text-sm">CareLink / </span><span className="text-sm font-semibold">{ROLE_LABELS[user.role]} workspace</span></div><div className="flex items-center gap-3"><span className="unit-badge">Unit {user.unit.toUpperCase()}</span><button className="text-xs text-slate-500" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} aria-label="Change language">{t('lang.toggle')}</button><UserButton/><button onClick={logout} className="text-xs font-semibold text-teal-700">Sign out</button></div></header>
+      <StatusBar showSync/>
+      <main className="care-main">{children}</main>
+      <footer className="care-footer"><span>DiagNXT CareLink · Connected care, from community to specialist</span><Link to={homeForRole(user.role)}>Workspace overview →</Link></footer>
     </div>
-  );
+  </div>;
 }
-
 export function BackLink({ to, label }: { to: string; label?: string }) {
   const { t } = useLang();
-  return (
-    <Link to={to} className="mb-3 inline-flex min-h-[48px] items-center gap-1 font-semibold text-brand">
-      <Icon name="back" size={20} />
-      {label ?? t('case.back')}
-    </Link>
-  );
+  return <Link to={to} className="mb-3 inline-flex min-h-[40px] items-center gap-1 text-sm font-semibold text-teal-700"><Icon name="back" size={18}/>{label ?? t('case.back')}</Link>;
 }

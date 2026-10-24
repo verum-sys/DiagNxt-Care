@@ -1,3 +1,4 @@
+import { useAuth } from '../../auth/AuthContext';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BackLink } from '../../components/Layout';
@@ -97,7 +98,9 @@ export function CategoryCases() {
   const [activeTab, setActiveTab] = useState<'all' | CaseCategory>(initialCategory);
   const { t } = useLang();
   const { data, loading } = useLive(listCases, []);
-  const ranked = data ? rankCases(data) : null;
+  const { user, isSuperAdmin } = useAuth();
+  const scoped = data?.filter(c => isSuperAdmin || (c.referral.unit || 'a') === user.unit);
+  const ranked = scoped ? rankCases(scoped) : null;
 
   const allOpenCases: CaseSummary[] = ranked ? [...ranked.needsAttention, ...ranked.active] : [];
   const criticalCases = allOpenCases.filter((c) => getCaseCategory(c) === 'critical');

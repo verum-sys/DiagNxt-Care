@@ -40,6 +40,8 @@ export const hi: Partial<Record<MessageKey, string>> = {
   'home.sync': 'सिंक और सेटिंग',
   'home.cardNew': 'नया रेफ़रल',
   'home.cardNewSub': 'मरीज़ जोड़ें',
+  'home.cardCbac': 'CBAC एनसीडी व रेफरल',
+  'home.cardCbacSub': 'स्क्रीनिंग व अस्पताल रेफरल',
   'home.cardCritical': 'गंभीर',
   'home.cardCriticalSub': 'कार्रवाई ज़रूरी',
   'home.cardPending': 'लंबित',
